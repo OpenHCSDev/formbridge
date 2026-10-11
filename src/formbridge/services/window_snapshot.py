@@ -84,7 +84,7 @@ def _validate_visual_observation(observation: WindowVisualObservation) -> None:
 
 
 class WindowSnapshotFrameCondition(StrEnum):
-    """Capture conditions evaluated from real renderer receipts (wire spelling)."""
+    """Closed capture conditions evaluated from real renderer receipts."""
 
     IMMEDIATE = ("immediate", NoObservation, _no_frame, False, False, _validate_visual_observation)
     FLASH_MAXIMUM_ALPHA = (
