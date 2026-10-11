@@ -1,4 +1,4 @@
-# reactive-core
+# formbridge
 
 Toolkit-neutral reactive forms and UI bridge contracts, shared by pyqt-reactive and headless servers
 

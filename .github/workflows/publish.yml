@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/reactive-core
+      url: https://pypi.org/p/formbridge
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,7 +25,7 @@ jobs:
           python-version: "3.12"
       - name: Verify release tag and main ancestry
         run: |
-          declared_version=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' src/reactive-core/__init__.py)
+          declared_version=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' src/formbridge/__init__.py)
           test "$GITHUB_REF_NAME" = "v$declared_version"
           git fetch origin main
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main
