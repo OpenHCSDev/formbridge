@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "reactive-core"
+dynamic = ["version"]
+description = "Toolkit-neutral reactive forms and UI bridge contracts, shared by pyqt-reactive and headless servers"
+authors = [{name = "Tristan Simas", email = "tristan.simas@mail.mcgill.ca"}]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.10"
+
+[project.urls]
+Homepage = "https://github.com/OpenHCSDev/reactive-core"
+
+[tool.hatch.version]
+path = "src/reactive_core/__init__.py"
