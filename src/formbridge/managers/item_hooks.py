@@ -13,8 +13,7 @@ class ItemIdProjection(ABC):
     """Projects a stable selection id from a manager backing item."""
 
     @abstractmethod
-    def __call__(self, item: Any) -> str:
-        ...
+    def __call__(self, item: Any) -> str: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,9 +24,7 @@ class DictItemIdProjection(ItemIdProjection):
 
     def __call__(self, item: Any) -> str:
         if not isinstance(item, Mapping):
-            raise TypeError(
-                f"Dict item-id projection expects Mapping, got {type(item).__name__}."
-            )
+            raise TypeError(f"Dict item-id projection expects Mapping, got {type(item).__name__}.")
         return str(item[self.key])
 
 
@@ -49,9 +46,7 @@ class AttributeItemIdProjection(ItemIdProjection):
 class ManagerItemHooks:
     """Typed source for list-item behavior consumed by AbstractManagerWidget."""
 
-    id_projection: ItemIdProjection = field(
-        default_factory=lambda: AttributeItemIdProjection("id")
-    )
+    id_projection: ItemIdProjection = field(default_factory=lambda: AttributeItemIdProjection("id"))
     preserve_selection_pred: Callable[[Any], bool] = lambda _manager: False
 
     def item_id(self, item: Any) -> str:

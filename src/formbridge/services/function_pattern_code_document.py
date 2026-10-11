@@ -16,6 +16,7 @@ from typing import Any, ClassVar, get_type_hints
 from objectstate import (
     ObjectState,
     ObjectStateRegistry,
+    ScopeKey,
     patch_lazy_constructors,
     semantic_values_equal,
 )
@@ -39,7 +40,6 @@ from formbridge.services.window_code_document import (
     WindowCodeDocument,
     WindowCodeDocumentDriver,
 )
-from objectstate import ScopeKey
 
 logger = logging.getLogger(__name__)
 FUNCTION_PATTERN_AUTHORITY_ATTR = "__function_pattern_authority__"

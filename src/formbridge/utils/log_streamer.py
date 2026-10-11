@@ -8,6 +8,7 @@ from pathlib import Path
 
 from formbridge.utils.log_highlighter import build_log_line_html
 
+
 def emit(obj: dict) -> None:
     sys.stdout.write(json.dumps(obj, ensure_ascii=True) + "\n")
     sys.stdout.flush()
@@ -18,7 +19,7 @@ def tail_lines(path: Path, max_lines: int) -> list[str]:
         return []
 
     buf: deque[str] = deque(maxlen=max_lines)
-    with open(path, "r", encoding="utf-8", errors="replace") as handle:
+    with open(path, encoding="utf-8", errors="replace") as handle:
         for line in handle:
             buf.append(line.rstrip("\n"))
     return list(buf)

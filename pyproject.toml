@@ -28,7 +28,8 @@ dependencies = [
     "metaclass-registry>=0.1.5",
     "objectstate>=2.0,<3",
     "psutil>=5.9",
-    "python-introspect>=0.2.6,<0.3",
+    "python-introspect>=0.2.7,<0.3",
+    "pyzmq>=22.0",
     "zmqruntime>=0.6,<0.7",
 ]
 

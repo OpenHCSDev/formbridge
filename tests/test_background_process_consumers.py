@@ -53,9 +53,7 @@ def test_system_metric_helpers_use_background_process_policy(monkeypatch) -> Non
     assert system_metrics_sampler.get_cpu_freq_mhz() == 2400
     system_metrics_sampler.PersistentNvidiaSmiPoller(
         cadence=system_metrics_sampler.PollingCadence(1.0),
-        temperature_sampling=(
-            system_metrics_sampler.GpuTemperatureSampling.ENABLED
-        ),
+        temperature_sampling=(system_metrics_sampler.GpuTemperatureSampling.ENABLED),
     ).start()
 
     assert check_output_calls[0]["creationflags"] == 73
@@ -77,9 +75,7 @@ def test_log_highlighter_uses_background_process_policy(monkeypatch) -> None:
     monkeypatch.setattr(
         log_highlight_client.subprocess,
         "Popen",
-        lambda command, **kwargs: (
-            captured.update(command=command, **kwargs) or process
-        ),
+        lambda command, **kwargs: captured.update(command=command, **kwargs) or process,
     )
     client = log_highlight_client.LogHighlightClient()
     try:

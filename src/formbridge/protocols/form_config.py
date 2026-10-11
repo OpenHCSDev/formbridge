@@ -3,8 +3,8 @@
 Provides hooks for applications to customize form generation behavior.
 """
 
-from typing import Any, Dict, Optional, Type, List
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -23,20 +23,20 @@ class FormGenConfig:
     enable_placeholder_styling: bool = True
     enable_help_buttons: bool = True
     enable_inheritance_tracking: bool = True
-    custom_widget_factories: Dict[Type, Any] = field(default_factory=dict)
-    jedi_project_paths: List[str] = field(default_factory=list)
-    log_dir: Optional[str] = None
-    log_prefixes: List[str] = field(default_factory=lambda: ["formbridge_"])
-    log_root_logger_name: Optional[str] = None
+    custom_widget_factories: dict[type, Any] = field(default_factory=dict)
+    jedi_project_paths: list[str] = field(default_factory=list)
+    log_dir: str | None = None
+    log_prefixes: list[str] = field(default_factory=lambda: ["formbridge_"])
+    log_root_logger_name: str | None = None
     performance_logger_name: str = "formbridge.performance"
     performance_log_filename: str = "performance.log"
-    path_cache_file: Optional[str] = None
+    path_cache_file: str | None = None
     external_editor_env_var: str = "PYQT_REACTIVE_USE_EXTERNAL_EDITOR"
     """Environment variable that, set to 1/true/yes, edits code in an external editor."""
 
 
 # Global config instance (set by application)
-_form_config: Optional[FormGenConfig] = None
+_form_config: FormGenConfig | None = None
 
 
 def set_form_config(config: FormGenConfig) -> None:

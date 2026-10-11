@@ -50,6 +50,7 @@ class BaseServerInfo(EndpointPortProviderABC, ABC, metaclass=AutoRegisterMeta):
     def server_name(self) -> str:
         return self.response.server
 
+
 @dataclass(frozen=True, slots=True)
 class ExecutionServerInfo(BaseServerInfo):
     """Execution server specific fields."""

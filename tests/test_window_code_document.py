@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from formbridge.protocols.codegen_provider import CodegenProviderABC
 from formbridge.protocols import codegen_provider
+from formbridge.protocols.codegen_provider import CodegenProviderABC
 from formbridge.services.window_code_document import WindowCodeDocument, WindowCodeDocumentDriver
 
 

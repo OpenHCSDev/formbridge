@@ -18,6 +18,7 @@ def test_explicit_override_is_editable_without_exposing_other_runtime_parameters
         pass
 
     monkeypatch.setattr(config, "_base_config_type", RootConfig)
+
     def process(image, *, policy: float = 1.0, runtime_context=None):
         return image
 
@@ -135,6 +136,6 @@ def test_code_mode_rebuilds_restored_state_with_stale_nested_dataclass_schema(
 
     assert updated is not state
     assert updated.parameters[stale_path] == 0.5
-    assert FunctionPatternCodeDocumentService.reconstruct_kwargs_from_state(
-        updated
-    ) == {"settings": Settings(threshold=2.0, correction_factor=0.5)}
+    assert FunctionPatternCodeDocumentService.reconstruct_kwargs_from_state(updated) == {
+        "settings": Settings(threshold=2.0, correction_factor=0.5)
+    }

@@ -8,8 +8,8 @@ from concurrent.futures import Future, ThreadPoolExecutor
 import pytest
 
 from formbridge.services.main_thread_dispatch import (
-    MainThreadDispatchError,
     MainThreadDispatcherClosedError,
+    MainThreadDispatchError,
     MainThreadDispatchTimeoutError,
     QueuedMainThreadDispatcher,
 )

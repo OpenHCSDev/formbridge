@@ -4,7 +4,6 @@ import json
 import re
 import sys
 
-
 _TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},\d{3}")
 _LOG_LEVEL_RE = re.compile(r"\b(ERROR|WARNING|INFO|DEBUG|CRITICAL)\b")
 _LOGGER_NAME_RE = re.compile(r" - ([\w\.]+) - ")
@@ -18,7 +17,13 @@ def parse_line(text: str) -> list[dict]:
 
     match = _TIMESTAMP_RE.match(text)
     if match:
-        segments.append({"start": match.start(), "length": match.end() - match.start(), "color": (105, 105, 105)})
+        segments.append(
+            {
+                "start": match.start(),
+                "length": match.end() - match.start(),
+                "color": (105, 105, 105),
+            }
+        )
 
     for match in _LOG_LEVEL_RE.finditer(text):
         level = match.group(1)
@@ -28,19 +33,46 @@ def parse_line(text: str) -> list[dict]:
             color = (255, 140, 0)
         else:
             color = (100, 160, 210)
-        segments.append({"start": match.start(), "length": match.end() - match.start(), "color": color, "bold": True})
+        segments.append(
+            {
+                "start": match.start(),
+                "length": match.end() - match.start(),
+                "color": color,
+                "bold": True,
+            }
+        )
 
     for match in _LOGGER_NAME_RE.finditer(text):
-        segments.append({"start": match.start(1), "length": match.end(1) - match.start(1), "color": (147, 112, 219)})
+        segments.append(
+            {
+                "start": match.start(1),
+                "length": match.end(1) - match.start(1),
+                "color": (147, 112, 219),
+            }
+        )
 
     for match in _FILE_PATH_RE.finditer(text):
-        segments.append({"start": match.start(), "length": match.end() - match.start(), "color": (34, 139, 34)})
+        segments.append(
+            {"start": match.start(), "length": match.end() - match.start(), "color": (34, 139, 34)}
+        )
 
     for match in _PYTHON_STRING_RE.finditer(text):
-        segments.append({"start": match.start(), "length": match.end() - match.start(), "color": (206, 145, 120)})
+        segments.append(
+            {
+                "start": match.start(),
+                "length": match.end() - match.start(),
+                "color": (206, 145, 120),
+            }
+        )
 
     for match in _NUMBER_RE.finditer(text):
-        segments.append({"start": match.start(), "length": match.end() - match.start(), "color": (181, 206, 168)})
+        segments.append(
+            {
+                "start": match.start(),
+                "length": match.end() - match.start(),
+                "color": (181, 206, 168),
+            }
+        )
 
     return segments
 
@@ -68,9 +100,7 @@ def build_log_line_html(text: str) -> str:
         style = f"color: rgb({red},{green},{blue});"
         if segment.get("bold"):
             style += " font-weight: 700;"
-        parts.append(
-            f'<span style="{style}">{_escape_html(text[start:end])}</span>'
-        )
+        parts.append(f'<span style="{style}">{_escape_html(text[start:end])}</span>')
         cursor = end
 
     if cursor < text_len:

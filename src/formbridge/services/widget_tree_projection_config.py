@@ -41,9 +41,7 @@ def compact_dataclass_projection(value: object) -> dict[str, Any]:
     """Project one dataclass through its field-owned compactness declarations."""
 
     if isinstance(value, type) or not is_dataclass(value):
-        raise TypeError(
-            f"Compact projection requires a dataclass instance, got {value!r}."
-        )
+        raise TypeError(f"Compact projection requires a dataclass instance, got {value!r}.")
     projected: dict[str, Any] = {}
     for declared_field in fields(value):
         field_value = getattr(value, declared_field.name)
@@ -53,10 +51,7 @@ def compact_dataclass_projection(value: object) -> dict[str, Any]:
                 f"{type(value).__name__}.{declared_field.name} declares an invalid "
                 "compact field projection."
             )
-        required = (
-            declared_field.default is MISSING
-            and declared_field.default_factory is MISSING
-        )
+        required = declared_field.default is MISSING and declared_field.default_factory is MISSING
         if required:
             includes = True
         elif isinstance(policy, CompactFieldProjection):
@@ -141,13 +136,8 @@ class WidgetTreeProjectionControls:
 
     def __post_init__(self) -> None:
         if self.maximum_text_length < len(self.truncation_suffix):
-            raise ValueError(
-                "maximum_text_length must be at least the truncation suffix length"
-            )
-        if (
-            self.maximum_item_model_nodes is not None
-            and self.maximum_item_model_nodes < 0
-        ):
+            raise ValueError("maximum_text_length must be at least the truncation suffix length")
+        if self.maximum_item_model_nodes is not None and self.maximum_item_model_nodes < 0:
             raise ValueError("maximum_item_model_nodes must be non-negative or None")
 
     def project_text(self, text: str) -> WidgetTextProjection:

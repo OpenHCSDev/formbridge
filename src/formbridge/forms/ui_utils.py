@@ -21,7 +21,7 @@ class FieldDisplayText:
 
     @classmethod
     def from_field_name(cls, name: str) -> "FieldDisplayText":
-        display_name = name.replace('_', ' ').title()
+        display_name = name.replace("_", " ").title()
         return cls(
             display_name=display_name,
             field_label=f"{display_name}:",

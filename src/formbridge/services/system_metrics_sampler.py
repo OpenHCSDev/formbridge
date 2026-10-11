@@ -12,14 +12,15 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import ClassVar, Generic, TypeVar
 
-from metaclass_registry import AutoRegisterMeta
 import psutil
+from metaclass_registry import AutoRegisterMeta
 from python_introspect import validate_annotated_dataclass
 from zmqruntime.config import PositiveFloat
 from zmqruntime.process_launch import BackgroundProcessLaunchPolicy
 
 try:
     import GPUtil
+
     GPU_AVAILABLE = True
 except ImportError:  # pragma: no cover - depends on optional runtime package
     GPUtil = None
@@ -39,7 +40,8 @@ def get_cpu_freq_mhz() -> int:
                 [
                     "powershell.exe",
                     "-Command",
-                    "Get-CimInstance -ClassName Win32_Processor | Select-Object -ExpandProperty CurrentClockSpeed",
+                    "Get-CimInstance -ClassName Win32_Processor"
+                    " | Select-Object -ExpandProperty CurrentClockSpeed",
                 ],
                 stderr=subprocess.DEVNULL,
                 timeout=2,
@@ -81,7 +83,7 @@ class GpuTemperatureSampling(Enum):
         cls,
         enabled: bool,
         projector: Callable[[float], float],
-    ) -> "GpuTemperatureSampling":
+    ) -> GpuTemperatureSampling:
         member = object.__new__(cls)
         member._value_ = enabled
         member._projector = projector
@@ -239,7 +241,7 @@ class MemoryMetrics:
     ram_available_gb: float = 0.0
 
     @classmethod
-    def from_psutil(cls, memory) -> "MemoryMetrics":
+    def from_psutil(cls, memory) -> MemoryMetrics:
         """Create one memory snapshot from psutil's virtual-memory result."""
 
         return cls(
@@ -262,7 +264,7 @@ class GpuMetrics:
     vram_total_mb: float = 0.0
 
     @classmethod
-    def unavailable(cls, name: str) -> "GpuMetrics":
+    def unavailable(cls, name: str) -> GpuMetrics:
         return cls(gpu_name=name)
 
 
@@ -283,7 +285,7 @@ class SystemMetrics:
         cpu_cores: int,
         cpu_freq_mhz: int,
         gpu: GpuMetrics,
-    ) -> "SystemMetrics":
+    ) -> SystemMetrics:
         return cls(
             cpu=CpuMetrics(
                 cpu_percent=cpu_percent,
@@ -295,7 +297,7 @@ class SystemMetrics:
         )
 
     @classmethod
-    def error(cls) -> "SystemMetrics":
+    def error(cls) -> SystemMetrics:
         return cls(gpu=GpuMetrics.unavailable("Error"))
 
 
@@ -402,11 +404,7 @@ class PersistentNvidiaSmiPoller(BackgroundPollerABC):
         vram_used_mb = _parse_number(parts[2])
         vram_total_mb = _parse_number(parts[3])
         gpu_name = parts[4] or "NVIDIA GPU"
-        vram_percent = (
-            (vram_used_mb / vram_total_mb) * 100.0
-            if vram_total_mb > 0
-            else 0.0
-        )
+        vram_percent = (vram_used_mb / vram_total_mb) * 100.0 if vram_total_mb > 0 else 0.0
         return GpuMetrics(
             gpu_percent=gpu_percent,
             vram_percent=vram_percent,
@@ -430,9 +428,7 @@ class SystemMetricsSampler:
         self._cpu_frequency_poller = (
             BackgroundMetricPoller(
                 name="CpuFrequencyPoller",
-                cadence=PollingCadence(
-                    self.config.cpu_frequency_refresh_seconds
-                ),
+                cadence=PollingCadence(self.config.cpu_frequency_refresh_seconds),
                 probe=get_cpu_freq_mhz,
                 default=0,
             )
@@ -490,9 +486,7 @@ class SystemMetricsSampler:
                 gpu_percent=gpu.load * 100,
                 vram_percent=gpu.memoryUtil * 100,
                 gpu_name=gpu.name,
-                gpu_temp=self.config.gpu_temperature_sampling.project(
-                    gpu.temperature
-                ),
+                gpu_temp=self.config.gpu_temperature_sampling.project(gpu.temperature),
                 vram_used_mb=gpu.memoryUsed,
                 vram_total_mb=gpu.memoryTotal,
             )

@@ -67,7 +67,7 @@ class HelpDocument:
         if docstring_info.examples:
             fence = _code_fence(docstring_info.examples)
             sections.append(
-                f"## Examples\n\n{fence}python\n" f"{docstring_info.examples.rstrip()}\n{fence}"
+                f"## Examples\n\n{fence}python\n{docstring_info.examples.rstrip()}\n{fence}"
             )
         return cls(
             content="\n\n".join(section for section in sections if section),

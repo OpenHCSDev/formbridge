@@ -63,9 +63,7 @@ def test_parameter_projection_uses_same_typed_document_model() -> None:
 
     assert document == HelpDocument(
         content=(
-            "# Batch size\n\n"
-            "**Images per request.**\n\n"
-            "Choose a value supported by the backend."
+            "# Batch size\n\n**Images per request.**\n\nChoose a value supported by the backend."
         ),
         markup=HelpDocumentFormat.MARKDOWN,
         title="Batch size",

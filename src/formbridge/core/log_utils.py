@@ -9,9 +9,8 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from enum import Enum, nonmember
+from enum import StrEnum, nonmember
 from pathlib import Path
-from typing import List, Optional
 
 from zmqruntime.execution.logs import ExecutionWorkerLogIdentity
 from zmqruntime.messages import ProcessIdentity
@@ -22,16 +21,14 @@ logger = logging.getLogger(__name__)
 LogDisplayNameResolver = Callable[[Path, str | None], str]
 
 
-class LogType(str, Enum):
+class LogType(StrEnum):
     """Closed log roles with member-owned presentation and ordering semantics."""
 
     _path_name = nonmember(lambda path, worker_id: path.name)
     _main_process = nonmember(lambda path, worker_id: "Main Process")
     _main_subprocess = nonmember(lambda path, worker_id: "Main Subprocess")
     _worker = nonmember(
-        lambda path, worker_id: (
-            f"Worker {worker_id}" if worker_id is not None else path.name
-        )
+        lambda path, worker_id: f"Worker {worker_id}" if worker_id is not None else path.name
     )
 
     def __new__(
@@ -72,7 +69,7 @@ def _get_log_dir() -> Path:
     return Path.home() / ".local" / "share" / "formbridge" / "logs"
 
 
-def _get_log_prefixes() -> List[str]:
+def _get_log_prefixes() -> list[str]:
     """Return configured log prefixes or default."""
     from formbridge.protocols.form_config import get_form_config
 
@@ -80,7 +77,7 @@ def _get_log_prefixes() -> List[str]:
     return config.log_prefixes or ["formbridge_"]
 
 
-def _match_prefixed(file_name: str, suffix: str) -> Optional[str]:
+def _match_prefixed(file_name: str, suffix: str) -> str | None:
     """Return matching prefix for a file name if it starts with prefix+suffix."""
     for prefix in _get_log_prefixes():
         if file_name.startswith(f"{prefix}{suffix}"):
@@ -124,9 +121,9 @@ class LogFileInfo:
 
     path: Path
     log_type: LogType
-    worker_id: Optional[str] = None
-    display_name: Optional[str] = None
-    process_identity: Optional[ProcessIdentity] = None
+    worker_id: str | None = None
+    display_name: str | None = None
+    process_identity: ProcessIdentity | None = None
 
     def __post_init__(self):
         """Generate display name if not provided."""
@@ -137,8 +134,11 @@ class LogFileInfo:
             )
 
 
-def discover_logs(base_log_path: Optional[str] = None, include_main_log: bool = True,
-                 log_directory: Optional[Path] = None) -> List[LogFileInfo]:
+def discover_logs(
+    base_log_path: str | None = None,
+    include_main_log: bool = True,
+    log_directory: Path | None = None,
+) -> list[LogFileInfo]:
     """
     Discover application log files and return as classified LogFileInfo objects.
 
@@ -180,16 +180,22 @@ def discover_logs(base_log_path: Optional[str] = None, include_main_log: bool = 
 
         if log_directory.exists():
             for log_file in log_directory.glob("*.log"):
-                if is_app_log_file(log_file) and log_file not in [log.path for log in discovered_logs]:
+                if is_app_log_file(log_file) and log_file not in [
+                    log.path for log in discovered_logs
+                ]:
                     # Infer base_log_path for proper classification
-                    inferred_base = infer_base_log_path(log_file) if 'subprocess_' in log_file.name else None
+                    inferred_base = (
+                        infer_base_log_path(log_file) if "subprocess_" in log_file.name else None
+                    )
                     log_info = classify_log_file(log_file, inferred_base, include_main_log)
                     discovered_logs.append(log_info)
 
     return discovered_logs
 
 
-def classify_log_file(log_path: Path, base_log_path: Optional[str] = None, include_tui_log: bool = True) -> LogFileInfo:
+def classify_log_file(
+    log_path: Path, base_log_path: str | None = None, include_tui_log: bool = True
+) -> LogFileInfo:
     """
     Pure function: Classify a log file and extract metadata.
 
@@ -220,8 +226,8 @@ def classify_log_file(log_path: Path, base_log_path: Optional[str] = None, inclu
     prefix = _match_prefixed(file_name, "zmq_server_port_")
     if prefix:
         # Extract port from filename
-        parts = file_name.replace(f'{prefix}zmq_server_port_', '').replace('.log', '').split('_')
-        port = parts[0] if parts else 'unknown'
+        parts = file_name.replace(f"{prefix}zmq_server_port_", "").replace(".log", "").split("_")
+        port = parts[0] if parts else "unknown"
         return LogFileInfo(
             log_path,
             LogType.ZMQ_SERVER,
@@ -240,8 +246,8 @@ def classify_log_file(log_path: Path, base_log_path: Optional[str] = None, inclu
         )
 
     # Check for Napari viewer logs
-    if file_name.startswith('napari_detached_port_'):
-        port = file_name.replace('napari_detached_port_', '').replace('.log', '')
+    if file_name.startswith("napari_detached_port_"):
+        port = file_name.replace("napari_detached_port_", "").replace(".log", "")
         return LogFileInfo(
             log_path,
             LogType.NAPARI,
@@ -257,10 +263,12 @@ def classify_log_file(log_path: Path, base_log_path: Optional[str] = None, inclu
             return LogFileInfo(log_path, LogType.MAIN)
 
         # Check if it's a worker log: {base_name}_worker_*.log
-        if file_name.startswith(f"{base_name}_worker_") and file_name.endswith('.log'):
+        if file_name.startswith(f"{base_name}_worker_") and file_name.endswith(".log"):
             # Extract worker ID (everything between _worker_ and .log)
-            worker_part = file_name[len(f"{base_name}_worker_"):-4]  # Remove .log suffix
-            worker_id = worker_part.split('_')[0]  # Take first part before any additional underscores
+            worker_part = file_name[len(f"{base_name}_worker_") : -4]  # Remove .log suffix
+            worker_id = worker_part.split("_")[
+                0
+            ]  # Take first part before any additional underscores
             return LogFileInfo(log_path, LogType.WORKER, worker_id)
 
     # Unknown or malformed log file
@@ -268,7 +276,7 @@ def classify_log_file(log_path: Path, base_log_path: Optional[str] = None, inclu
     return LogFileInfo(log_path, LogType.UNKNOWN)
 
 
-def is_relevant_log_file(file_path: Path, base_log_path: Optional[str]) -> bool:
+def is_relevant_log_file(file_path: Path, base_log_path: str | None) -> bool:
     """
     Check if file is a relevant log file for monitoring.
 
@@ -289,7 +297,7 @@ def is_relevant_log_file(file_path: Path, base_log_path: Optional[str]) -> bool:
     if file_name == f"{base_name}.log":
         return True
 
-    if file_name.startswith(f"{base_name}_worker_") and file_name.endswith('.log'):
+    if file_name.startswith(f"{base_name}_worker_") and file_name.endswith(".log"):
         return True
 
     return False
@@ -305,7 +313,7 @@ def is_app_log_file(file_path: Path) -> bool:
     Returns:
         bool: True if file matches configured log prefixes
     """
-    if not file_path.name.endswith('.log'):
+    if not file_path.name.endswith(".log"):
         return False
 
     file_name = file_path.name
@@ -335,14 +343,10 @@ def infer_base_log_path(file_path: Path) -> str:
     file_name = file_path.name
 
     # Handle worker logs: remove _worker_* suffix
-    if '_worker_' in file_name:
-        base_name = file_name.split('_worker_')[0]
+    if "_worker_" in file_name:
+        base_name = file_name.split("_worker_")[0]
     else:
         # Handle main subprocess logs: remove .log extension
         base_name = file_path.stem
 
     return str(file_path.parent / base_name)
-
-
-# Backward compatibility alias
-is_openhcs_log_file = is_app_log_file

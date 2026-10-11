@@ -5,18 +5,18 @@ This module provides pure system metrics collection without any visualization de
 Can be used by any UI framework (PyQt, Textual, etc.) for system monitoring.
 """
 
-from collections import deque
-from dataclasses import dataclass
 import platform
 import time
+from collections import deque
+from dataclasses import dataclass
 
 import psutil
 
 from formbridge.services.system_metrics_sampler import (
-    CpuMetrics,
-    GPUtil,
     GPU_AVAILABLE,
+    CpuMetrics,
     GpuMetrics,
+    GPUtil,
     MemoryMetrics,
     SystemMetrics,
     SystemMetricsSampler,
@@ -46,11 +46,11 @@ class SystemInformation:
 class SystemMonitorCore:
     """
     Framework-agnostic system monitoring core.
-    
+
     Collects CPU, RAM, GPU, and VRAM metrics without any visualization dependencies.
     Maintains historical data in deques for efficient time-series tracking.
     """
-    
+
     def __init__(
         self,
         history_length: int = 60,
@@ -59,7 +59,7 @@ class SystemMonitorCore:
     ):
         """
         Initialize the system monitor core.
-        
+
         Args:
             history_length: Number of historical data points to keep
         """
@@ -75,7 +75,7 @@ class SystemMonitorCore:
         # Cache current metrics to avoid duplicate system calls
         self._current_metrics = SystemMetrics()
         self._sampler = sampler
-        
+
         # Initialize with zeros
         for _ in range(history_length):
             self.cpu_history.append(0)
@@ -83,11 +83,11 @@ class SystemMonitorCore:
             self.gpu_history.append(0)
             self.vram_history.append(0)
             self.time_stamps.append(0)
-    
+
     def update_metrics(self) -> None:
         """
         Update system metrics and cache current values.
-        
+
         Collects CPU, RAM, GPU, and VRAM usage and appends to history.
         Updates the typed internal cache for efficient access.
         """
@@ -109,7 +109,7 @@ class SystemMonitorCore:
         self.vram_history.append(metrics.gpu.vram_percent)
         self.time_stamps.append(time.time() if timestamp is None else timestamp)
         self._current_metrics = metrics
-    
+
     def get_metrics(self) -> SystemMetrics:
         """Return the latest typed metrics snapshot without sampling again."""
 
@@ -125,7 +125,7 @@ class SystemMonitorCore:
             vram=tuple(self.vram_history),
             timestamps=tuple(self.time_stamps),
         )
-    
+
     def get_system_info(self) -> SystemInformation:
         """Return one typed static system-information snapshot."""
 
@@ -156,7 +156,7 @@ class SystemMonitorCore:
                 gpu=gpu_metrics,
             ),
         )
-    
+
     def reset_history(self) -> None:
         """Reset all historical data to zeros."""
         self.cpu_history.clear()
@@ -164,7 +164,7 @@ class SystemMonitorCore:
         self.gpu_history.clear()
         self.vram_history.clear()
         self.time_stamps.clear()
-        
+
         # Re-initialize with zeros
         for _ in range(self.history_length):
             self.cpu_history.append(0)
@@ -172,7 +172,7 @@ class SystemMonitorCore:
             self.gpu_history.append(0)
             self.vram_history.append(0)
             self.time_stamps.append(0)
-        
+
         self._current_metrics = SystemMetrics()
 
     def close(self) -> None:

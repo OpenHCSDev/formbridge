@@ -16,9 +16,7 @@ def _formbridge_modules() -> tuple[str, ...]:
     return tuple(
         sorted(
             module.name
-            for module in pkgutil.walk_packages(
-                formbridge.__path__, prefix="formbridge."
-            )
+            for module in pkgutil.walk_packages(formbridge.__path__, prefix="formbridge.")
         )
     )
 

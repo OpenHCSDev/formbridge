@@ -53,25 +53,27 @@ def test_required_empty_fields_survive_even_an_excluding_policy():
     class RequiredValues:
         empty: str
         absent: None
-        disabled: bool = field(metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
-                includes=lambda _owner, _value: False
-            )
-        })
+        disabled: bool = field(
+            metadata={
+                COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
+                    includes=lambda _owner, _value: False
+                )
+            }
+        )
 
-    value = RequiredValues('', None, False)
-    assert compact_dataclass_projection(value) == {
-        'empty': '', 'absent': None, 'disabled': False
-    }
+    value = RequiredValues("", None, False)
+    assert compact_dataclass_projection(value) == {"empty": "", "absent": None, "disabled": False}
 
 
 def test_empty_values_differing_from_defaults_remain_distinct():
     @dataclass
     class OptionalValues:
         enabled: bool | None = None
-        name: str = 'default'
+        name: str = "default"
         entries: tuple = field(default_factory=tuple)
 
-    assert compact_dataclass_projection(OptionalValues(False, '')) == {
-        'enabled': False, 'name': '', 'entries': ()
+    assert compact_dataclass_projection(OptionalValues(False, "")) == {
+        "enabled": False,
+        "name": "",
+        "entries": (),
     }

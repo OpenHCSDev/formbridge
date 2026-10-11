@@ -44,6 +44,4 @@ class ManagerReorderController:
             operations.update_item_list()
 
         direction = "up" if to_index < from_index else "down"
-        operations.emit_status(
-            f"Moved {operations.item_name_singular} '{item_id}' {direction}"
-        )
+        operations.emit_status(f"Moved {operations.item_name_singular} '{item_id}' {direction}")

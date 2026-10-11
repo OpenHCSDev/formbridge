@@ -85,9 +85,7 @@ def register_component_selection_provider(
 ) -> None:
     """Register a global component selection provider."""
     if not isinstance(provider, ComponentSelectionProviderABC):
-        raise TypeError(
-            "Component selection providers must inherit " "ComponentSelectionProviderABC."
-        )
+        raise TypeError("Component selection providers must inherit ComponentSelectionProviderABC.")
     global _component_selection_provider
     _component_selection_provider = provider
 
@@ -102,9 +100,7 @@ def register_function_selection_provider(
 ) -> None:
     """Register a global function selection provider."""
     if not isinstance(provider, FunctionSelectionProviderABC):
-        raise TypeError(
-            "Function selection providers must inherit " "FunctionSelectionProviderABC."
-        )
+        raise TypeError("Function selection providers must inherit FunctionSelectionProviderABC.")
     global _function_selection_provider
     _function_selection_provider = provider
 

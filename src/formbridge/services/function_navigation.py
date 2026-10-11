@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import ClassVar, Mapping, Optional
+from typing import ClassVar
 
 from objectstate import DottedFieldPath
 
@@ -37,10 +38,9 @@ class FunctionPatternField:
 
         if not isinstance(field_path, str):
             return False
-        return (
-            DottedFieldPath(cls.parameter_name()).contains_path(field_path)
-            or field_path.startswith(cls.token_field_prefix)
-        )
+        return DottedFieldPath(cls.parameter_name()).contains_path(
+            field_path
+        ) or field_path.startswith(cls.token_field_prefix)
 
 
 FUNCTION_FIELD_ROOT = FunctionPatternField.parameter_name()
@@ -52,8 +52,8 @@ FUNCTION_TARGET_DELIMITER = FunctionPatternField.target_delimiter
 class FunctionFieldTarget:
     """Parsed function navigation target."""
 
-    token: Optional[str]
-    index: Optional[int]
+    token: str | None
+    index: int | None
     base_field_path: str
 
 
@@ -80,7 +80,7 @@ def build_function_token_field_path(
 def parse_function_field_target(field_path: str) -> FunctionFieldTarget:
     """Parse function field path into token/index/base components."""
     normalized = field_path.strip()
-    token: Optional[str] = None
+    token: str | None = None
 
     if normalized.startswith(FunctionPatternField.token_field_prefix):
         payload = normalized[len(FunctionPatternField.token_field_prefix) :]
@@ -95,7 +95,7 @@ def parse_function_field_target(field_path: str) -> FunctionFieldTarget:
             token = payload.strip() or None
             normalized = FunctionPatternField.parameter_name()
 
-    index: Optional[int] = None
+    index: int | None = None
     rest = normalized
     if rest.startswith(FunctionPatternField.parameter_name()):
         rest = rest[len(FunctionPatternField.parameter_name()) :]

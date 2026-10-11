@@ -6,10 +6,11 @@ import ast
 import inspect
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, fields, is_dataclass
 from enum import Enum
 from types import UnionType
-from typing import Annotated, Callable, Optional, Union, get_args, get_origin
+from typing import Annotated, Union, get_args, get_origin
 
 from objectstate.lazy_factory import get_base_type_for_lazy, is_lazy_dataclass
 from python_introspect import (
@@ -86,10 +87,11 @@ class ParameterDescriptionFormatter:
         """Return display-ready body prose for parameter help."""
         return self.format_inline_list_markers(self.strip_rst_directives(text))
 
+
 PARAMETER_DESCRIPTION_FORMATTER = ParameterDescriptionFormatter()
 
 
-def dataclass_type_for_target(target: Union[Callable, type, None]) -> type | None:
+def dataclass_type_for_target(target: Callable | type | None) -> type | None:
     """Return the dataclass type represented by a help target."""
     if target is None:
         return None
@@ -204,8 +206,7 @@ def dataclass_type_from_annotation(annotation) -> type | None:
 
     if origin in (Union, UnionType):
         dataclass_args = tuple(
-            arg for arg in get_args(annotation)
-            if inspect.isclass(arg) and is_dataclass(arg)
+            arg for arg in get_args(annotation) if inspect.isclass(arg) and is_dataclass(arg)
         )
         if len(dataclass_args) == 1:
             return dataclass_args[0]
@@ -218,14 +219,11 @@ def dataclass_field_description(description: str | None, annotation) -> str | No
     signature_type_names: tuple[str, ...] = ()
     if field_type is not None:
         source_type = source_dataclass_type(field_type)
-        signature_type_names = tuple(
-            dict.fromkeys((field_type.__name__, source_type.__name__))
-        )
+        signature_type_names = tuple(dict.fromkeys((field_type.__name__, source_type.__name__)))
     if description and (
         field_type is None
         or not any(
-            is_signature_docstring(description, type_name)
-            for type_name in signature_type_names
+            is_signature_docstring(description, type_name) for type_name in signature_type_names
         )
     ):
         return description
@@ -259,7 +257,7 @@ def dataclass_parameter_descriptions(dataclass_type: type) -> dict[str, str]:
     return descriptions
 
 
-def docstring_info_for_target(target: Union[Callable, type]) -> DocstringInfo:
+def docstring_info_for_target(target: Callable | type) -> DocstringInfo:
     """Return help-window documentation, using field docs for dataclass targets."""
     dataclass_type = dataclass_type_for_target(target)
     if dataclass_type is None:
@@ -285,9 +283,9 @@ def docstring_info_for_target(target: Union[Callable, type]) -> DocstringInfo:
 
 
 def parameter_description_from_target(
-    help_target: Union[Callable, type, None],
+    help_target: Callable | type | None,
     param_name: str,
-) -> Optional[str]:
+) -> str | None:
     """Return parsed documentation for one parameter from a callable/class target."""
     if help_target is None:
         return None
@@ -298,7 +296,7 @@ def parameter_description_from_target(
 
 def resolved_parameter_description(
     *,
-    help_target: Union[Callable, type, None],
+    help_target: Callable | type | None,
     param_name: str,
     widget_description: str,
 ) -> str:

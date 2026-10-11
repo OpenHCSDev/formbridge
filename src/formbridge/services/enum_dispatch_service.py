@@ -22,7 +22,7 @@ Example:
     class MyStrategy(Enum):
         TYPE_A = "type_a"
         TYPE_B = "type_b"
-    
+
     class MyService(EnumDispatchService[MyStrategy]):
         def __init__(self):
             super().__init__()
@@ -30,103 +30,104 @@ Example:
                 MyStrategy.TYPE_A: self._handle_type_a,
                 MyStrategy.TYPE_B: self._handle_type_b,
             })
-        
+
         def _determine_strategy(self, context, **kwargs) -> MyStrategy:
             # Logic to determine which strategy to use
             return MyStrategy.TYPE_A if some_condition else MyStrategy.TYPE_B
-        
+
         def _handle_type_a(self, context, **kwargs):
             # Handler implementation
             pass
-        
+
         def _handle_type_b(self, context, **kwargs):
             # Handler implementation
             pass
-        
+
         def process(self, context, **kwargs):
             # Public API - uses dispatch
             return self.dispatch(context, **kwargs)
 """
 
-from abc import ABC, abstractmethod
-from enum import Enum
-from typing import TypeVar, Generic, Dict, Callable, Any
 import logging
+from abc import ABC, abstractmethod
+from collections.abc import Callable
+from enum import Enum
+from typing import Any, Generic, TypeVar
 
 logger = logging.getLogger(__name__)
 
 # Type variable for the strategy enum
-StrategyEnum = TypeVar('StrategyEnum', bound=Enum)
+StrategyEnum = TypeVar("StrategyEnum", bound=Enum)
 
 
 class EnumDispatchService(ABC, Generic[StrategyEnum]):
     """
     Abstract base class for services using enum-driven polymorphic dispatch.
-    
+
     Subclasses must:
     1. Define a strategy enum (e.g., ResetStrategy, ValueCollectionStrategy)
     2. Implement _determine_strategy() to select the appropriate strategy
     3. Register handlers in __init__() using _register_handlers()
     4. Implement handler methods for each strategy
-    
+
     The dispatch() method handles the actual dispatching logic.
     """
-    
+
     def __init__(self):
         """Initialize the service with an empty handler registry."""
-        self._handlers: Dict[StrategyEnum, Callable] = {}
-    
-    def _register_handlers(self, handlers: Dict[StrategyEnum, Callable]) -> None:
+        self._handlers: dict[StrategyEnum, Callable] = {}
+
+    def _register_handlers(self, handlers: dict[StrategyEnum, Callable]) -> None:
         """
         Register strategy handlers.
-        
+
         Args:
             handlers: Dictionary mapping strategy enum values to handler methods
-        
+
         Raises:
             ValueError: If handlers dict is empty or contains invalid strategies
         """
         if not handlers:
             raise ValueError(f"{self.__class__.__name__}: Handler registry cannot be empty")
-        
+
         self._handlers = handlers
         logger.debug(f"{self.__class__.__name__}: Registered {len(handlers)} handlers")
-    
+
     @abstractmethod
     def _determine_strategy(self, *args, **kwargs) -> StrategyEnum:
         """
         Determine which strategy to use based on input.
-        
+
         This method must be implemented by subclasses to analyze the input
         and return the appropriate strategy enum value.
-        
+
         Returns:
             Strategy enum value indicating which handler to use
         """
         pass
-    
+
     def dispatch(self, *args, **kwargs) -> Any:
         """
         Dispatch to the appropriate handler based on determined strategy.
-        
+
         This is the core dispatch logic that:
         1. Determines the strategy using _determine_strategy()
         2. Looks up the handler in the registry
         3. Calls the handler with the provided arguments
-        
+
         Args:
             *args: Positional arguments to pass to the handler
             **kwargs: Keyword arguments to pass to the handler
-        
+
         Returns:
             Result from the handler method
-        
+
         Raises:
             KeyError: If strategy is not registered in handlers
         """
         # Determine which strategy to use
         strategy = self._determine_strategy(*args, **kwargs)
-        
+
         # Look up handler
         if strategy not in self._handlers:
             raise KeyError(
@@ -147,25 +148,24 @@ class EnumDispatchService(ABC, Generic[StrategyEnum]):
         # errors when handlers are bound instance methods.
         handler_args = args[:1] if args else ()
         return handler(*handler_args, **kwargs)
-    
+
     def get_registered_strategies(self) -> list[StrategyEnum]:
         """
         Get list of all registered strategies.
-        
+
         Returns:
             List of strategy enum values that have registered handlers
         """
         return list(self._handlers.keys())
-    
+
     def has_strategy(self, strategy: StrategyEnum) -> bool:
         """
         Check if a strategy has a registered handler.
-        
+
         Args:
             strategy: Strategy enum value to check
-        
+
         Returns:
             True if strategy has a registered handler, False otherwise
         """
         return strategy in self._handlers
-

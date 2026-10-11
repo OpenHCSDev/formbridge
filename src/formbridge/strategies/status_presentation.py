@@ -1,9 +1,10 @@
 """Status presentation strategy abstractions."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -19,7 +20,7 @@ class StatusPresentationResult:
     """Rendered output from a status presentation strategy."""
 
     text: str
-    color_hex: Optional[str] = None
+    color_hex: str | None = None
 
 
 class StatusPresentationStrategyABC(ABC):

@@ -46,9 +46,7 @@ def test_convert_value_to_type_rebuilds_optional_dataclass_tuple() -> None:
         "source_filters",
     )
 
-    assert converted == (
-        MatchClause(subject=MatchSubject.DIRECTORY, value="TimePoint_1"),
-    )
+    assert converted == (MatchClause(subject=MatchSubject.DIRECTORY, value="TimePoint_1"),)
 
 
 def test_convert_value_to_type_validates_mapping_keys_and_values() -> None:
@@ -132,8 +130,7 @@ def test_convert_value_to_type_accepts_enum_member_names() -> None:
     service = ParameterFormService()
 
     assert (
-        service.convert_value_to_type("INHERIT", InheritableMode, "mode")
-        is InheritableMode.INHERIT
+        service.convert_value_to_type("INHERIT", InheritableMode, "mode") is InheritableMode.INHERIT
     )
     assert (
         service.convert_value_to_type(
@@ -196,21 +193,30 @@ def test_pep604_optional_dataclass_uses_shared_optional_authority() -> None:
 def test_declared_nested_field_path_uses_exact_field_name() -> None:
     service = ParameterFormService()
 
-    assert service.resolve_declared_field_path(
-        NestedConfigOwner,
-        "primary",
-        NestedConfig,
-    ) == "primary"
-    assert service.resolve_declared_field_path(
-        NestedConfigOwner,
-        "secondary",
-        NestedConfig,
-    ) == "secondary"
-    assert service.resolve_declared_field_path(
-        type(None),
-        "function_config",
-        NestedConfig,
-    ) == "function_config"
+    assert (
+        service.resolve_declared_field_path(
+            NestedConfigOwner,
+            "primary",
+            NestedConfig,
+        )
+        == "primary"
+    )
+    assert (
+        service.resolve_declared_field_path(
+            NestedConfigOwner,
+            "secondary",
+            NestedConfig,
+        )
+        == "secondary"
+    )
+    assert (
+        service.resolve_declared_field_path(
+            type(None),
+            "function_config",
+            NestedConfig,
+        )
+        == "function_config"
+    )
 
 
 def test_declared_nested_field_path_fails_on_missing_or_mismatched_owner() -> None:

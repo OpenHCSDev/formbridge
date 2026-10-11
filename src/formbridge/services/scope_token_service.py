@@ -10,10 +10,9 @@ from __future__ import annotations
 import logging
 from abc import ABC
 from collections.abc import Callable, Iterable, Sequence
-from typing import Optional, TypeVar
+from typing import TypeVar
 
-from objectstate import semantic_values_equal
-from objectstate import ScopeKey
+from objectstate import ScopeKey, semantic_values_equal
 
 logger = logging.getLogger(__name__)
 
@@ -46,10 +45,7 @@ def reconcile_occurrence_tokens(
         for index, token in enumerate(previous_tokens[: len(previous_occurrences)])
         if token and token not in claimed
     }
-    token_to_previous = {
-        str(previous_tokens[index]): index
-        for index in available
-    }
+    token_to_previous = {str(previous_tokens[index]): index for index in available}
     previous_token_set = {
         str(token) for token in previous_tokens[: len(previous_occurrences)] if token
     }
@@ -90,23 +86,15 @@ def reconcile_occurrence_tokens(
         available.remove(previous_index)
         claimed.add(token)
 
-    unresolved_next = {
-        index for index, token in enumerate(resolved) if token is None
-    }
-    previous_authorities = [
-        tuple(occurrence_authorities(value)) for value in previous_occurrences
-    ]
-    next_authorities = [
-        tuple(occurrence_authorities(value)) for value in next_occurrences
-    ]
+    unresolved_next = {index for index, token in enumerate(resolved) if token is None}
+    previous_authorities = [tuple(occurrence_authorities(value)) for value in previous_occurrences]
+    next_authorities = [tuple(occurrence_authorities(value)) for value in next_occurrences]
     authority_level_count = max(
         (len(authorities) for authorities in previous_authorities + next_authorities),
         default=0,
     )
     for authority_level in range(authority_level_count):
-        unresolved_next = {
-            index for index, token in enumerate(resolved) if token is None
-        }
+        unresolved_next = {index for index, token in enumerate(resolved) if token is None}
         authority_candidates = {
             next_index: {
                 previous_index
@@ -128,8 +116,7 @@ def reconcile_occurrence_tokens(
             competing_next = {
                 candidate
                 for candidate in unresolved_next
-                if resolved[candidate] is None
-                and previous_index in authority_candidates[candidate]
+                if resolved[candidate] is None and previous_index in authority_candidates[candidate]
             }
             if len(competing_next) != 1:
                 continue
@@ -158,7 +145,7 @@ class ScopeTokenObjectStore:
     """Persist scope tokens without exposing attribute probing to callers."""
 
     @classmethod
-    def read(cls, obj: ScopeTokenTarget, attr_name: str) -> Optional[str]:
+    def read(cls, obj: ScopeTokenTarget, attr_name: str) -> str | None:
         attributes = cls._instance_attributes(obj)
         if attributes is not None and attr_name in attributes:
             token = attributes[attr_name]
@@ -190,7 +177,7 @@ class ScopeTokenGenerator:
       (e.g., after deserialization).
     """
 
-    def __init__(self, prefix: str, attr_name: Optional[str] = None):
+    def __init__(self, prefix: str, attr_name: str | None = None):
         self.prefix = prefix
         self.attr_name = attr_name
         self._counter: int = 0
@@ -221,7 +208,7 @@ class ScopeTokenGenerator:
                 self._register_existing(token)
 
     # ---------- Public API ----------
-    def ensure(self, obj: Optional[ScopeTokenTarget] = None) -> str:
+    def ensure(self, obj: ScopeTokenTarget | None = None) -> str:
         """Return an existing token on obj or generate a new one."""
         existing = self._get_existing(obj)
         if existing:
@@ -251,18 +238,18 @@ class ScopeTokenGenerator:
             self.ensure(obj)
 
     # ---------- Internals ----------
-    def _get_existing(self, obj: Optional[ScopeTokenTarget]) -> Optional[str]:
+    def _get_existing(self, obj: ScopeTokenTarget | None) -> str | None:
         if obj is None or not self.attr_name:
             return None
         token = self.existing_token(obj, self.attr_name)
         return token
 
     @staticmethod
-    def existing_token(obj: ScopeTokenTarget, attr_name: str) -> Optional[str]:
+    def existing_token(obj: ScopeTokenTarget, attr_name: str) -> str | None:
         """Return an existing token from the configured storage attribute."""
         return ScopeTokenObjectStore.read(obj, attr_name)
 
-    def _attach(self, obj: Optional[ScopeTokenTarget], token: str) -> None:
+    def _attach(self, obj: ScopeTokenTarget | None, token: str) -> None:
         if obj is None or not self.attr_name:
             return
         ScopeTokenObjectStore.write(obj, self.attr_name, token)
@@ -300,6 +287,7 @@ class ScopeTokenService:
         ScopeTokenService.build_scope_id(plate_path, step)   # → "plate::step_0"
         ScopeTokenService.build_scope_id(step_scope, func)   # → "plate::step_0::func_0"
     """
+
     SCOPE_TOKEN_ATTRIBUTE = "_scope_token"
     _generators: dict[tuple[str, str], ScopeTokenGenerator] = {}
 
@@ -321,7 +309,10 @@ class ScopeTokenService:
         key = (parent_scope, prefix)
         if key not in cls._generators:
             cls._generators[key] = ScopeTokenGenerator(prefix, cls.SCOPE_TOKEN_ATTRIBUTE)
-            logger.debug(f"🔑 ScopeTokenService: Created generator for parent_scope={parent_scope}, prefix={prefix}")
+            logger.debug(
+                f"🔑 ScopeTokenService: Created generator for parent_scope={parent_scope}, "
+                f"prefix={prefix}"
+            )
         return cls._generators[key]
 
     @classmethod
@@ -405,8 +396,11 @@ class ScopeTokenService:
         cache_key = (parent_scope, id(obj))
         cached = cls._scope_id_cache.get(cache_key)
         existing_token = cls.object_token(obj)
-        if (cached is not None and existing_token is not None
-                and cached == cls._scope_id_for_token(parent_scope, existing_token)):
+        if (
+            cached is not None
+            and existing_token is not None
+            and cached == cls._scope_id_for_token(parent_scope, existing_token)
+        ):
             return cached
 
         token = cls.ensure_token(parent_scope, obj)
@@ -452,4 +446,6 @@ class ScopeTokenService:
             del cls._scope_id_cache[key]
 
         if keys_to_remove:
-            logger.debug(f"🔑 ScopeTokenService: Cleared {len(keys_to_remove)} generators for {parent_scope}")
+            logger.debug(
+                f"🔑 ScopeTokenService: Cleared {len(keys_to_remove)} generators for {parent_scope}"
+            )

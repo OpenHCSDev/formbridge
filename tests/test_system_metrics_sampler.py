@@ -10,11 +10,11 @@ from formbridge.services.parameter_help_service import dataclass_parameter_descr
 from formbridge.services.system_metrics_sampler import (
     BackgroundMetricPoller,
     CpuMetrics,
-    GpuTemperatureSampling,
     GpuMetrics,
+    GpuTemperatureSampling,
     MemoryMetrics,
-    PollingCadence,
     PersistentNvidiaSmiPoller,
+    PollingCadence,
     SystemMetrics,
     SystemMetricsSampler,
     SystemMetricsSamplerConfig,
@@ -27,9 +27,7 @@ def test_sampler_config_projects_complete_declaration_help() -> None:
 
     assert set(descriptions) == field_names
     assert all(descriptions[name].strip() for name in field_names)
-    assert "GPU utilization and memory metrics" in descriptions[
-        "enable_gpu_monitoring"
-    ]
+    assert "GPU utilization and memory metrics" in descriptions["enable_gpu_monitoring"]
     assert "interval in seconds" in descriptions["cpu_frequency_refresh_seconds"]
 
 
@@ -42,7 +40,7 @@ class MemorySnapshot:
 
 
 class FakeCpuFrequencyPoller:
-    created: list["FakeCpuFrequencyPoller"] = []
+    created: list[FakeCpuFrequencyPoller] = []
 
     def __init__(self, *, name, cadence, probe, default) -> None:
         self.name = name
@@ -60,7 +58,7 @@ class FakeCpuFrequencyPoller:
 
 
 class FakeGpuMetricsPoller:
-    created: list["FakeGpuMetricsPoller"] = []
+    created: list[FakeGpuMetricsPoller] = []
 
     def __init__(self, *, cadence, temperature_sampling) -> None:
         self.cadence = cadence
@@ -182,10 +180,7 @@ def test_gpu_temperature_monitoring_leaf_reaches_gpu_provider(monkeypatch) -> No
 
     sampler = SystemMetricsSampler(config)
 
-    assert (
-        FakeGpuMetricsPoller.created[-1].temperature_sampling
-        is GpuTemperatureSampling.DISABLED
-    )
+    assert FakeGpuMetricsPoller.created[-1].temperature_sampling is GpuTemperatureSampling.DISABLED
     sampler.close()
 
 

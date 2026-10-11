@@ -11,7 +11,7 @@ def main() -> int:
 
     log_path = Path(sys.argv[1])
     try:
-        with open(log_path, "r", encoding="utf-8", errors="replace") as handle:
+        with open(log_path, encoding="utf-8", errors="replace") as handle:
             sys.stdout.write(handle.read())
         return 0
     except Exception as exc:

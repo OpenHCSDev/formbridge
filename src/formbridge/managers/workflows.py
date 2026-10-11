@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any
 
 from metaclass_registry import AutoRegisterMeta
 
@@ -19,7 +19,7 @@ class ManagerCodeExecutionWorkflow(ABC, metaclass=AutoRegisterMeta):
         self,
         code: str,
         error: Exception,
-    ) -> Optional[dict]:
+    ) -> dict | None:
         raise NotImplementedError
 
     @abstractmethod
@@ -40,7 +40,7 @@ class NullManagerCodeExecutionWorkflow(ManagerCodeExecutionWorkflow):
         self,
         code: str,
         error: Exception,
-    ) -> Optional[dict]:
+    ) -> dict | None:
         del code, error
         return None
 

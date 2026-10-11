@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from objectstate import ObjectStateRegistry
 
@@ -33,9 +33,11 @@ class ManagerTimeTravelBinding:
     def disconnect(self) -> None:
         ObjectStateRegistry.remove_unregister_callback(self.on_registry_unregister)
         ObjectStateRegistry.remove_register_callback(self.on_registry_register)
-        ObjectStateRegistry.remove_time_travel_complete_callback(self._manager.on_time_travel_complete)
+        ObjectStateRegistry.remove_time_travel_complete_callback(
+            self._manager.on_time_travel_complete
+        )
 
-    def on_registry_unregister(self, scope_key: str, state: "ObjectState") -> None:
+    def on_registry_unregister(self, scope_key: str, state: ObjectState) -> None:
         del state
         manager = self._manager
         item = self._find_backing_item_by_scope(manager, scope_key)
@@ -48,7 +50,7 @@ class ManagerTimeTravelBinding:
             manager.update_item_list()
             logger.debug("TIME_TRAVEL: Removed item from UI: %s", scope_key)
 
-    def on_registry_register(self, scope_key: str, state: "ObjectState") -> None:
+    def on_registry_register(self, scope_key: str, state: ObjectState) -> None:
         del state
         if not self.in_time_travel:
             return
@@ -72,7 +74,7 @@ class ManagerTimeTravelBinding:
         manager.update_item_list()
         manager.update_button_states()
 
-    def _find_backing_item_by_scope(self, manager: Any, scope_key: str) -> Optional[Any]:
+    def _find_backing_item_by_scope(self, manager: Any, scope_key: str) -> Any | None:
         if manager.SCOPE_ITEM_TYPE is None:
             return None
 

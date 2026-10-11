@@ -17,16 +17,16 @@ Pattern (React-style):
         class ParameterInfo:
             is_optional: bool
             is_nested: bool
-        
+
         if info.is_optional and info.is_nested:
             # handle optional dataclass
-    
+
     Use:
         @dataclass
         class OptionalDataclassInfo(metaclass=ParameterInfoMeta):
             @staticmethod
             def matches(param_type): ...
-        
+
         if isinstance(info, OptionalDataclassInfo):
             # Type checker knows info is OptionalDataclassInfo!
 
@@ -39,13 +39,14 @@ Architecture:
     - create_parameter_info(): Factory that auto-selects correct type
 """
 
-from typing import Callable, Type, Optional, List, Union
-from dataclasses import dataclass, is_dataclass
-from abc import ABC, ABCMeta
 import logging
+from abc import ABC, ABCMeta
+from collections.abc import Callable
+from dataclasses import dataclass, is_dataclass
 
 from objectstate.lazy_factory import get_base_type_for_lazy
 from python_introspect import optional_member_type
+
 from formbridge.forms.parameter_value_contracts import ParameterValue
 
 logger = logging.getLogger(__name__)
@@ -57,12 +58,12 @@ InlineDataclassWidgetFactory = Callable
 class _InlineDataclassWidgetCatalog:
     """Private registry authority for dataclasses with structural inline editors."""
 
-    _factories: dict[Type, InlineDataclassWidgetFactory] = {}
+    _factories: dict[type, InlineDataclassWidgetFactory] = {}
 
     @classmethod
     def register(
         cls,
-        dataclass_type: Type,
+        dataclass_type: type,
         widget_factory: InlineDataclassWidgetFactory,
     ) -> None:
         if not is_dataclass(dataclass_type):
@@ -73,7 +74,7 @@ class _InlineDataclassWidgetCatalog:
         cls._factories[dataclass_type] = widget_factory
 
     @classmethod
-    def factory_for(cls, dataclass_type: Type) -> InlineDataclassWidgetFactory | None:
+    def factory_for(cls, dataclass_type: type) -> InlineDataclassWidgetFactory | None:
         for candidate_type in cls._candidate_types(dataclass_type):
             factory = cls._factories.get(candidate_type)
             if factory is not None:
@@ -81,11 +82,11 @@ class _InlineDataclassWidgetCatalog:
         return None
 
     @classmethod
-    def has_factory_for(cls, dataclass_type: Type) -> bool:
+    def has_factory_for(cls, dataclass_type: type) -> bool:
         return cls.factory_for(dataclass_type) is not None
 
     @classmethod
-    def _candidate_types(cls, dataclass_type: Type) -> tuple[Type, ...]:
+    def _candidate_types(cls, dataclass_type: type) -> tuple[type, ...]:
         """Return exact, lazy-base, and inherited dataclass types for lookup."""
 
         base_type = get_base_type_for_lazy(dataclass_type)
@@ -94,8 +95,8 @@ class _InlineDataclassWidgetCatalog:
             if base_type is None or base_type is dataclass_type
             else (dataclass_type, base_type)
         )
-        candidates: list[Type] = []
-        seen: set[Type] = set()
+        candidates: list[type] = []
+        seen: set[type] = set()
         for root_type in root_types:
             for candidate_type in root_type.__mro__:
                 if candidate_type is object or candidate_type in seen:
@@ -106,7 +107,7 @@ class _InlineDataclassWidgetCatalog:
 
 
 def register_inline_dataclass_widget(
-    dataclass_type: Type,
+    dataclass_type: type,
     widget_factory: InlineDataclassWidgetFactory,
 ) -> None:
     """Register a full-row editor for a dataclass type before nested fallback."""
@@ -116,10 +117,11 @@ def register_inline_dataclass_widget(
 @dataclass
 class ParameterInfoBase(ABC):
     """ABC for parameter information objects - enforces explicit interface."""
+
     name: str
-    type: Type
+    type: type
     current_value: ParameterValue | None
-    description: Optional[str] = None
+    description: str | None = None
 
     # Widget creation type - subclasses override. Imported lazily to avoid circular imports.
     widget_creation_type: str = "REGULAR"  # Default, overridden by subclasses
@@ -128,29 +130,30 @@ class ParameterInfoBase(ABC):
 class ParameterInfoMeta(ABCMeta):
     """
     Metaclass for auto-registration of ParameterInfo types.
-    
+
     All classes with a matches() method are automatically registered
     in the global registry for use by the factory function.
-    
+
     This eliminates manual registration and enables zero-boilerplate
     addition of new parameter types.
     """
-    _registry: List[Type] = []
-    
+
+    _registry: list[type] = []
+
     def __new__(mcs, name, bases, namespace):
         cls = super().__new__(mcs, name, bases, namespace)
-        
+
         # Auto-register if it has a matches() predicate
-        if 'matches' in namespace and callable(namespace['matches']):
+        if "matches" in namespace and callable(namespace["matches"]):
             mcs._registry.append(cls)
             logger.debug(f"Auto-registered ParameterInfo type: {name}")
-        
+
         return cls
-    
+
     @classmethod
-    def get_registry(mcs) -> List[Type]:
+    def get_registry(cls) -> list[type]:
         """Get all registered ParameterInfo types."""
-        return mcs._registry.copy()
+        return cls._registry.copy()
 
 
 @dataclass
@@ -168,12 +171,13 @@ class OptionalDataclassInfo(ParameterInfoBase, metaclass=ParameterInfoMeta):
         def process(config: Optional[ProcessingConfig]): ...
         def analyze(settings: Optional[AnalysisSettings]): ...
     """
+
     default_value: ParameterValue | None = None
     is_required: bool = True
     widget_creation_type: str = "OPTIONAL_NESTED"
 
     @staticmethod
-    def matches(param_type: Type) -> bool:
+    def matches(param_type: type) -> bool:
         """
         Predicate: Does this type annotation match Optional[Dataclass]?
 
@@ -195,15 +199,15 @@ class InlineDataclassWidgetInfo(ParameterInfoBase, metaclass=ParameterInfoMeta):
     - Use a registered widget instead of the default nested field form
     - Fall back to DirectDataclassInfo when no inline widget is registered
     """
+
     default_value: ParameterValue | None = None
     is_required: bool = True
     widget_creation_type: str = "INLINE_DATACLASS"
 
     @staticmethod
-    def matches(param_type: Type) -> bool:
-        return (
-            is_dataclass(param_type)
-            and _InlineDataclassWidgetCatalog.has_factory_for(param_type)
+    def matches(param_type: type) -> bool:
+        return is_dataclass(param_type) and _InlineDataclassWidgetCatalog.has_factory_for(
+            param_type
         )
 
     def widget_factory(self) -> InlineDataclassWidgetFactory:
@@ -231,12 +235,13 @@ class DirectDataclassInfo(ParameterInfoBase, metaclass=ParameterInfoMeta):
         def process(config: ProcessingConfig): ...
         def analyze(settings: AnalysisSettings): ...
     """
+
     default_value: ParameterValue | None = None
     is_required: bool = True
     widget_creation_type: str = "NESTED"
 
     @staticmethod
-    def matches(param_type: Type) -> bool:
+    def matches(param_type: type) -> bool:
         """
         Predicate: Does this type annotation match a direct Dataclass?
 
@@ -263,11 +268,12 @@ class GenericInfo(ParameterInfoBase, metaclass=ParameterInfoMeta):
         def analyze(input_path: Path): ...
         def filter(sigma: float): ...
     """
+
     default_value: ParameterValue | None = None
     is_required: bool = True
 
     @staticmethod
-    def matches(param_type: Type) -> bool:
+    def matches(param_type: type) -> bool:
         """
         Predicate: Fallback - matches everything.
 
@@ -278,28 +284,25 @@ class GenericInfo(ParameterInfoBase, metaclass=ParameterInfoMeta):
 
 
 # Union type for type hints (React-style)
-ParameterInfo = Union[
-    OptionalDataclassInfo,
-    InlineDataclassWidgetInfo,
-    DirectDataclassInfo,
-    GenericInfo,
-]
+ParameterInfo = (
+    OptionalDataclassInfo | InlineDataclassWidgetInfo | DirectDataclassInfo | GenericInfo
+)
 
 
 def create_parameter_info(
     name: str,
-    param_type: Type,
+    param_type: type,
     current_value: ParameterValue | None,
     default_value: ParameterValue | None = None,
-    description: Optional[str] = None,
-    is_required: bool = True
+    description: str | None = None,
+    is_required: bool = True,
 ) -> ParameterInfo:
     """
     Factory function that auto-selects the correct ParameterInfo subclass.
-    
+
     Uses type introspection to determine which ParameterInfo type to create.
     This eliminates manual if-elif-else chains and enables type-safe dispatch.
-    
+
     Args:
         name: Parameter name
         param_type: Parameter type annotation
@@ -307,26 +310,26 @@ def create_parameter_info(
         default_value: Default parameter value
         description: Parameter description
         is_required: Whether parameter is required
-    
+
     Returns:
         Correct ParameterInfo subclass instance
-    
+
     Raises:
         ValueError: If no matching ParameterInfo type found
-    
+
     Examples:
         >>> from typing import Optional
         >>> @dataclass
         ... class Config: pass
-        
+
         >>> info1 = create_parameter_info('config', Optional[Config], None)
         >>> type(info1).__name__
         'OptionalDataclassInfo'
-        
+
         >>> info2 = create_parameter_info('config', Config, Config())
         >>> type(info2).__name__
         'DirectDataclassInfo'
-        
+
         >>> info3 = create_parameter_info('value', int, 42)
         >>> type(info3).__name__
         'GenericInfo'
@@ -340,9 +343,9 @@ def create_parameter_info(
                 current_value=current_value,
                 default_value=default_value,
                 description=description,
-                is_required=is_required
+                is_required=is_required,
             )
-    
+
     # Should never reach here due to GenericInfo fallback
     raise ValueError(
         f"No matching ParameterInfo type for {param_type}. "

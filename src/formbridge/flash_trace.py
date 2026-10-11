@@ -3,10 +3,10 @@ from __future__ import annotations
 import logging
 import time
 from collections import deque
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import (
     Any,
-    Iterable,
 )
 
 logger = logging.getLogger("formbridge.flash_trace")
@@ -29,9 +29,7 @@ class FlashTrace:
     @classmethod
     def record(cls, event: str, **fields: Any) -> None:
         normalized_fields = tuple(
-            (name, cls._format_value(value))
-            for name, value in fields.items()
-            if value is not None
+            (name, cls._format_value(value)) for name, value in fields.items() if value is not None
         )
         cls._records.append(
             FlashTraceRecord(
