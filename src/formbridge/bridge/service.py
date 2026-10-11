@@ -962,12 +962,12 @@ class UiBridgeSwitchBranchOperation(UiObjectStateRestoreOperation, UiObjectState
     request_type = UiBranchSwitchRequest
 
 
-class UiBridgeDescriptorDirectoryAuthority:
+class UiBridgeDescriptorDirectories:
     """Filesystem location policy for live UI bridge descriptors."""
 
     @staticmethod
     def default_descriptor_dir() -> Path:
-        return UiBridgeDescriptorDirectoryAuthority.descriptor_dirs()[0]
+        return UiBridgeDescriptorDirectories.descriptor_dirs()[0]
 
     @classmethod
     def descriptor_dirs(cls) -> tuple[Path, ...]:
@@ -1021,7 +1021,7 @@ class UiBridgeGatewayUnavailableError(ConnectionError, UiBridgeGatewayErrorABC):
     @staticmethod
     def discovery_hint() -> str:
         searched_dirs = ", ".join(
-            str(path) for path in UiBridgeDescriptorDirectoryAuthority.descriptor_dirs()
+            str(path) for path in UiBridgeDescriptorDirectories.descriptor_dirs()
         )
         return (
             "Pass descriptor_file_path, set OPENHCS_UI_BRIDGE_DESCRIPTOR, set "
@@ -1451,7 +1451,7 @@ class UiBridgeDescriptorCatalog:
 
         descriptor_paths: list[Path] = []
         results: list[UiBridgeDescriptorReadResult] = []
-        for directory in UiBridgeDescriptorDirectoryAuthority.descriptor_dirs():
+        for directory in UiBridgeDescriptorDirectories.descriptor_dirs():
             if not directory.exists():
                 continue
             for path in sorted(directory.glob("ui_bridge_*.json")):

@@ -48,7 +48,7 @@ from formbridge.bridge.dto import (
 )
 from formbridge.bridge.in_process import UiAgentBridgeService
 from formbridge.bridge.service import (
-    UiBridgeDescriptorDirectoryAuthority,
+    UiBridgeDescriptorDirectories,
     UiBridgeOperation,
 )
 from formbridge.connection import EndpointConnectionSpec
@@ -112,7 +112,7 @@ class UiBridgeServerConfig(EndpointConnectionSpec):
     def descriptor_directory_or_default(self) -> Path:
         if self.descriptor_directory_path is not None:
             return AgentRuntimePlatform.resolved_path(self.descriptor_directory_path)
-        return UiBridgeDescriptorDirectoryAuthority.default_descriptor_dir()
+        return UiBridgeDescriptorDirectories.default_descriptor_dir()
 
 
 @dataclass(frozen=True, slots=True)
@@ -233,7 +233,7 @@ class UiBridgeValueErrorClassifier(UiBridgeRequestExceptionClassifier):
     error_code = "invalid_ui_bridge_request"
 
 
-class UiBridgeRequestErrorAuthority:
+class UiBridgeRequestErrors:
     """Classify request-dispatch exceptions into agent-facing error codes."""
 
     DEFAULT_ERROR_CODE = "ui_bridge_request_failed"
@@ -356,7 +356,7 @@ class UiBridgeRequestDispatcher:
 
     @staticmethod
     def _agent_error(exception: Exception) -> AgentError:
-        return UiBridgeRequestErrorAuthority.agent_error(exception)
+        return UiBridgeRequestErrors.agent_error(exception)
 
 
 class UiBridgeControlServer:
