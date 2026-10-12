@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.1.5
+
+Requires `python-introspect>=0.3.0,<0.4` (was `<0.3`), `objectstate>=4.0.1,<5`
+and `zmqruntime>=0.6.5,<0.7`.
+
+Wire and stored form: unchanged. python-introspect 0.3 stores a field whose
+declared type admits several classes (a union of dataclasses, an abstract
+dataclass, a registered family) as `{tag: fields}`. No bridge request, result,
+envelope or descriptor file has such a field, so a 0.1.4 and a 0.1.5 bridge
+peer exchange the same JSON and descriptor files written by 0.1.4 still read.
+Fields declared `type[Family]` (`field_filter`, `status`) keep the registry
+key spelling.
+
+A field declared as one concrete class carries that class only; a subclass
+with more fields is refused when decoded (as before). The identity, address
+and connection fields of the bridge results are of this kind
+(`UiActionIdentity`, `UiCodeDocumentIdentity`, `UiStateSurfaceIdentity`,
+`UiWindowIdentity`, `UiSemanticAddress`, `EndpointConnectionSpec`); the
+requests that inherit from them are narrowed before they are stored there.
+
+Fixed:
+
+- A refused, busy or accepted `mutate_object_state_field` result put the whole
+  request in its `address` field, so the client could not decode it
+  (`UiSemanticAddress received undeclared field(s)`) and the caller saw a
+  decoding error instead of the refusal. The result now carries
+  `request.as_address()`. `UiSemanticAddress.as_address()` is new.
+
 ## 0.1.4
 
 Requires ObjectState 4 (`objectstate>=4.0.0,<5`). No code change: formbridge
