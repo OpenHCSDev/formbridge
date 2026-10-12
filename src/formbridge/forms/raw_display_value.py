@@ -32,7 +32,7 @@ class RawDisplayValue:
             )
 
     @classmethod
-    def shown_as_edited(cls, value_type: type, raw: object) -> "RawDisplayValue":
+    def shown_as_edited(cls, value_type: type, raw: object) -> RawDisplayValue:
         """A value with nothing inherited: it is shown exactly as edited."""
 
         return cls(value_type, raw, raw)
@@ -78,7 +78,7 @@ class RawDisplayValue:
             if item.name == field_name
         )
 
-    def replacing(self, **changes: object) -> "RawDisplayValue":
+    def replacing(self, **changes: object) -> RawDisplayValue:
         """The value after an edit: the fields change in both ``raw`` and ``display``."""
 
         return RawDisplayValue(
@@ -87,20 +87,7 @@ class RawDisplayValue:
             replace_raw(self.display, **changes),
         )
 
-    def displaying(self, display: object) -> "RawDisplayValue":
+    def displaying(self, display: object) -> RawDisplayValue:
         """The same edited value shown with newly resolved inherited fields."""
 
         return RawDisplayValue(self.value_type, self.raw, display)
-
-    def differently_shown_fields(
-        self,
-        other: "RawDisplayValue",
-        field_names: tuple[str, ...],
-    ) -> tuple[str, ...]:
-        """The named fields whose shown values differ between two values."""
-
-        return tuple(
-            name
-            for name in field_names
-            if self.display_field(name) != other.display_field(name)
-        )

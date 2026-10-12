@@ -52,14 +52,6 @@ def test_replacing_changes_raw_and_display_together() -> None:
     assert not edited.shows_inherited("names")
 
 
-def test_differently_shown_fields_names_only_changed_fields() -> None:
-    before = RawDisplayValue.shown_as_edited(Settings, Settings(names=("a",), limit=1))
-    after = before.displaying(Settings(names=("a",), limit=2))
-
-    assert before.differently_shown_fields(after, ("names", "limit")) == ("limit",)
-    assert before.differently_shown_fields(after, ("names",)) == ()
-
-
 def test_field_default_comes_from_the_dataclass() -> None:
     value = RawDisplayValue.shown_as_edited(Settings, Settings(limit=9))
 
