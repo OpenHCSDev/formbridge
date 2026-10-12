@@ -70,3 +70,25 @@ def test_preview_formatter_registration_rejects_a_second_formatter_for_one_type(
     with pytest.raises(ValueError, match="OnceConfig already has a preview formatter"):
         PreviewFormatterRegistry.register(OnceConfig, lambda _config, _field_name: "second")
     assert PreviewFormatterRegistry.format_field(OnceConfig(), "value") == "first:value"
+
+
+def test_group_heading_default_reads_the_objectstate_declaration() -> None:
+    from objectstate.lazy_factory import abbreviation, get_group_abbreviation
+
+    from formbridge.strategies.preview_formatting import FormattingConfig
+
+    @abbreviation("cfg")
+    @dataclass
+    class HeadedConfig:
+        value: int = 0
+
+    class SpecializedHeadedConfig(HeadedConfig):
+        pass
+
+    lazy_type = LazyDataclassFactory.make_lazy_simple(HeadedConfig, "LazyHeadedConfig")
+    heading = FormattingConfig().container_abbr_func
+
+    assert heading is get_group_abbreviation
+    assert heading(HeadedConfig) == "cfg"
+    assert heading(SpecializedHeadedConfig) == "cfg"
+    assert heading(lazy_type) == "cfg"
