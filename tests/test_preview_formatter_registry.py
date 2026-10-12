@@ -55,3 +55,18 @@ def test_preview_formatter_ignores_lazy_wrapper_registration() -> None:
     )
 
     assert PreviewFormatterRegistry.format_field(lazy_type(), "value") == "base"
+
+
+def test_preview_formatter_registration_rejects_a_second_formatter_for_one_type() -> None:
+    class OnceConfig:
+        pass
+
+    def formatter(_config: object, field_name: str) -> str:
+        return f"first:{field_name}"
+
+    PreviewFormatterRegistry.register(OnceConfig, formatter)
+    PreviewFormatterRegistry.register(OnceConfig, formatter)
+
+    with pytest.raises(ValueError, match="OnceConfig already has a preview formatter"):
+        PreviewFormatterRegistry.register(OnceConfig, lambda _config, _field_name: "second")
+    assert PreviewFormatterRegistry.format_field(OnceConfig(), "value") == "first:value"

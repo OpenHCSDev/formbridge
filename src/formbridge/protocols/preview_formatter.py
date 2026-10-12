@@ -39,6 +39,12 @@ class PreviewFormatterRegistry:
             config_type: Config class to format
             formatter: Formatter function taking (config, field_name) -> str
         """
+        registered = cls._formatters.get(config_type)
+        if registered is not None and registered is not formatter:
+            raise ValueError(
+                f"{config_type.__qualname__} already has a preview formatter "
+                f"({registered!r}); it cannot also use {formatter!r}."
+            )
         cls._formatters[config_type] = formatter
 
     @classmethod
