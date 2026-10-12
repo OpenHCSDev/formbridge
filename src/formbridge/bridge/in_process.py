@@ -985,7 +985,7 @@ class UiAgentBridgeService(UiBridgeOperationServer):
         except UiBridgeBusyError as exc:
             return UiObjectStateFieldMutationResult(
                 schema_version=SCHEMA_VERSION,
-                address=request,
+                address=request.as_address(),
                 mutated=False,
                 reset=request.reset,
                 receipt=UiMutationReceipt.rejected_for(request.request_token),

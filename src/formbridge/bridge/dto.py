@@ -196,6 +196,11 @@ class UiSemanticAddress:
     field_path: str
     window_id: str | None = None
 
+    def as_address(self) -> UiSemanticAddress:
+        """The address alone, without the fields of a request that carries it."""
+
+        return project_dataclass(UiSemanticAddress, self)
+
 
 @dataclass(frozen=True, kw_only=True)
 class UiActionIdentity(UiWidgetIdentity):

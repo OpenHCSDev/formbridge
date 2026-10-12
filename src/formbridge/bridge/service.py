@@ -515,7 +515,7 @@ class UiBridgeMutateObjectStateFieldOperation(UiBridgeOperation):
     def failed(cls, request, errors):
         return UiObjectStateFieldMutationResult(
             schema_version=SCHEMA_VERSION,
-            address=request,
+            address=request.as_address(),
             mutated=False,
             reset=request.reset,
             receipt=UiMutationReceipt.rejected_for(request.request_token),
@@ -526,7 +526,7 @@ class UiBridgeMutateObjectStateFieldOperation(UiBridgeOperation):
     def accepted(cls, request, bridge_operation):
         return UiObjectStateFieldMutationResult(
             schema_version=SCHEMA_VERSION,
-            address=request,
+            address=request.as_address(),
             mutated=False,
             reset=request.reset,
             receipt=UiMutationReceipt.accepted_for(
