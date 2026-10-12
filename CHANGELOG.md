@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.4
+
+Requires ObjectState 4 (`objectstate>=4.0.0,<5`). No code change: formbridge
+calls none of the names ObjectState 4 removed (the global config setters and
+`get_current_global_config`).
+
 ## 0.1.3
 
 Requires `metaclass-registry>=0.4.0`, `objectstate>=3.0.1,<4` and
