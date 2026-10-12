@@ -9,10 +9,55 @@ description = "Toolkit-neutral reactive forms and UI bridge contracts, shared by
 authors = [{name = "Tristan Simas", email = "tristan.simas@mail.mcgill.ca"}]
 license = {text = "MIT"}
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: User Interfaces",
+]
+keywords = ["forms", "reactive", "dataclass", "ui-bridge", "headless"]
+
+dependencies = [
+    "docutils>=0.20",
+    "metaclass-registry>=0.1.5",
+    "objectstate>=2.0,<3",
+    "psutil>=5.9",
+    "python-introspect>=0.2.7,<0.3",
+    "pyzmq>=22.0",
+    "zmqruntime>=0.6,<0.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff==0.16.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/OpenHCSDev/formbridge"
+Repository = "https://github.com/OpenHCSDev/formbridge"
+Issues = "https://github.com/OpenHCSDev/formbridge/issues"
 
 [tool.hatch.version]
 path = "src/formbridge/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/formbridge"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
