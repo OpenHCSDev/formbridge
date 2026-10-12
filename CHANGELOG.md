@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.3
+
+Requires `metaclass-registry>=0.4.0`, `objectstate>=3.0.1,<4` and
+`zmqruntime>=0.6.4,<0.7`.
+
+Changed:
+
+- A type has one inline-widget factory and one preview formatter.
+  `PreviewFormatterRegistry.register` and the inline-widget factory
+  registration raise `ValueError` when a different registrant is given for a
+  type that already has one, instead of replacing it. Registering the same
+  one again does nothing.
+
 ## 0.1.2
 
 Requires ObjectState 3 (`objectstate>=3.0,<4`).

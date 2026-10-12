@@ -71,6 +71,12 @@ class _InlineDataclassWidgetCatalog:
                 "Inline dataclass widgets can only be registered for dataclass types; "
                 f"got {dataclass_type!r}."
             )
+        registered = cls._factories.get(dataclass_type)
+        if registered is not None and registered is not widget_factory:
+            raise ValueError(
+                f"{dataclass_type.__qualname__} already has an inline widget factory "
+                f"({registered!r}); it cannot also use {widget_factory!r}."
+            )
         cls._factories[dataclass_type] = widget_factory
 
     @classmethod

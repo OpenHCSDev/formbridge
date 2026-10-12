@@ -1,2 +1,2 @@
 # Source candidates needed to validate this checkout before coordinated publication.
-# Empty: every first-party dependency is released (objectstate 3.0.0).
+# Empty: every first-party dependency is released (objectstate 3.0.1, zmqruntime 0.6.4, metaclass-registry 0.4.0).
