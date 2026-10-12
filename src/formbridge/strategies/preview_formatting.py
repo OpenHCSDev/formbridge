@@ -7,11 +7,11 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, TypeAlias
 
 from objectstate import DottedFieldPath, ParameterOwner
+from objectstate.lazy_factory import get_group_abbreviation
 
 from formbridge.utils.preview_formatters import (
     PreviewFieldFormatRequest,
     PreviewValueDetail,
-    canonical_declaration_mro,
     format_preview_value,
 )
 
@@ -21,17 +21,6 @@ if TYPE_CHECKING:
 PreviewSegment: TypeAlias = tuple[str, str | None, str | None]
 PreviewValueFormatter: TypeAlias = Callable[[PreviewFieldFormatRequest], str | None]
 ItemValueFormatter: TypeAlias = Callable[[object], str | None]
-
-
-def get_group_abbreviation(config_type: type) -> str:
-    """Resolve a group abbreviation from the canonical declaration MRO."""
-    from objectstate.lazy_factory import GROUP_ABBREVIATIONS_REGISTRY
-
-    for declaration_type in canonical_declaration_mro(config_type):
-        abbreviation = GROUP_ABBREVIATIONS_REGISTRY.get(declaration_type)
-        if abbreviation is not None:
-            return abbreviation
-    return config_type.__name__.split("_", 1)[0]
 
 
 @dataclass(frozen=True, slots=True)
