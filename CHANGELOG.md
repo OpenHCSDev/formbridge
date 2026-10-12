@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.2
+
+Requires ObjectState 3 (`objectstate>=3.0,<4`).
+
+- `strategies.preview_formatting` reads a config group's abbreviation with
+  `objectstate.lazy_factory.get_group_abbreviation`, the one owner of that
+  lookup in ObjectState 3 (`GROUP_ABBREVIATIONS_REGISTRY` is removed there).
+  The module's own copy of the lookup is deleted; the name
+  `formbridge.strategies.preview_formatting.get_group_abbreviation` is now
+  ObjectState's function.
+
 ## 0.1.1
 
 Added:

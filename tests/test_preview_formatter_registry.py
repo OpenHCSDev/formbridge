@@ -55,3 +55,25 @@ def test_preview_formatter_ignores_lazy_wrapper_registration() -> None:
     )
 
     assert PreviewFormatterRegistry.format_field(lazy_type(), "value") == "base"
+
+
+def test_group_heading_default_reads_the_objectstate_declaration() -> None:
+    from objectstate.lazy_factory import abbreviation, get_group_abbreviation
+
+    from formbridge.strategies.preview_formatting import FormattingConfig
+
+    @abbreviation("cfg")
+    @dataclass
+    class HeadedConfig:
+        value: int = 0
+
+    class SpecializedHeadedConfig(HeadedConfig):
+        pass
+
+    lazy_type = LazyDataclassFactory.make_lazy_simple(HeadedConfig, "LazyHeadedConfig")
+    heading = FormattingConfig().container_abbr_func
+
+    assert heading is get_group_abbreviation
+    assert heading(HeadedConfig) == "cfg"
+    assert heading(SpecializedHeadedConfig) == "cfg"
+    assert heading(lazy_type) == "cfg"
