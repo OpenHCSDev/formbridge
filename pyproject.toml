@@ -25,12 +25,12 @@ keywords = ["forms", "reactive", "dataclass", "ui-bridge", "headless"]
 
 dependencies = [
     "docutils>=0.20",
-    "metaclass-registry>=0.1.5",
-    "objectstate>=3.0,<4",
+    "metaclass-registry>=0.4.0",
+    "objectstate>=3.0.1,<4",
     "psutil>=5.9",
     "python-introspect>=0.2.7,<0.3",
     "pyzmq>=22.0",
-    "zmqruntime>=0.6,<0.7",
+    "zmqruntime>=0.6.4,<0.7",
 ]
 
 [project.optional-dependencies]
