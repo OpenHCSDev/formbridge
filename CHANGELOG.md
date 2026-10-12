@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1
+
+Added:
+
+- `forms.raw_display_value.RawDisplayValue`: a form's edited value kept with
+  the value it shows.
+
 ## 0.1.0
 
 First release.
