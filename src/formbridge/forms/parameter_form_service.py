@@ -41,7 +41,7 @@ from python_introspect import (
 )
 
 from formbridge.forms.parameter_form_constants import CONSTANTS
-from formbridge.forms.parameter_info_types import ParameterInfo, create_parameter_info
+from formbridge.forms.parameter_info_types import OptionalDataclassInfo, ParameterInfo
 from formbridge.forms.parameter_type_utils import ParameterTypeUtils
 from formbridge.forms.parameter_value_contracts import (
     FormObject,
@@ -96,7 +96,9 @@ class FormStructure:
     field_id: str
     parameters: list[ParameterInfo]
     nested_forms: dict[str, "FormStructure"]
-    has_optional_dataclasses: bool = False
+    @property
+    def has_optional_dataclasses(self) -> bool:
+        return any(isinstance(info, OptionalDataclassInfo) for info in self.parameters)
 
     def get_parameter_info(self, param_name: str) -> ParameterInfo | None:
         """
@@ -148,7 +150,7 @@ class ParameterFormService:
             name = declaration.name
             if self._should_hide_from_ui(parent_type, name, declaration.param_type):
                 continue
-            yield path, create_parameter_info(
+            yield path, ParameterInfo.create(
                 name=name,
                 param_type=declaration.param_type,
                 current_value=state.get_resolved_value(path.value),
@@ -186,7 +188,6 @@ class ParameterFormService:
 
         param_infos = []
         nested_forms = {}
-        has_optional_dataclasses = False
 
         for param_name, parameter_type in input.param_type.items():
             current_value = input.default_value.get(param_name)
@@ -210,45 +211,23 @@ class ParameterFormService:
             )
             param_infos.append(param_info)
 
-            # Check for nested dataclasses using isinstance (type-safe!)
-            from formbridge.forms.parameter_info_types import (
-                DirectDataclassInfo,
-                OptionalDataclassInfo,
-            )
-
-            if isinstance(param_info, (OptionalDataclassInfo, DirectDataclassInfo)):
-                # Get actual field path from FieldPathDetector (no artificial "nested_" prefix)
-                # Unwrap Optional types to get the actual dataclass type for field path detection
-                unwrapped_param_type = self._unwrap_optional_dataclass_type(parameter_type)
-
-                # For function parameters (no parent dataclass), use parameter name directly
-                if input.parent_obj_type is None:
-                    nested_field_id = param_name
-                else:
-                    nested_field_id = self.resolve_declared_field_path(
-                        input.parent_obj_type,
-                        param_name,
-                        unwrapped_param_type,
-                    )
-
-                nested_structure = self._analyze_nested_dataclass(
-                    param_name,
-                    parameter_type,
-                    current_value,
-                    nested_field_id,
-                    input.parent_obj_type,
-                )
+            nested_structure = param_info.nested_form(self, input)
+            if nested_structure is not None:
                 nested_forms[param_name] = nested_structure
-
-            # Check for optional dataclasses using isinstance (type-safe!)
-            if isinstance(param_info, OptionalDataclassInfo):
-                has_optional_dataclasses = True
 
         return FormStructure(
             field_id=input.field_id,
             parameters=param_infos,
             nested_forms=nested_forms,
-            has_optional_dataclasses=has_optional_dataclasses,
+        )
+
+    def analyze_nested_parameter(self, info: ParameterInfo, analysis: ParameterAnalysisInput) -> FormStructure:
+        """Build the nested presentation requested by the admitted kind."""
+        unwrapped_type = self._unwrap_optional_dataclass_type(info.type)
+        nested_field_id = (info.name if analysis.parent_obj_type is None else
+                           self.resolve_declared_field_path(analysis.parent_obj_type, info.name, unwrapped_type))
+        return self._analyze_nested_dataclass(
+            info.name, info.type, info.current_value, nested_field_id, analysis.parent_obj_type,
         )
 
     def _should_hide_from_ui(
@@ -756,7 +735,7 @@ class ParameterFormService:
         Create parameter information object using discriminated union factory.
 
         Uses type introspection to automatically select the correct ParameterInfo
-        subclass (OptionalDataclassInfo, DirectDataclassInfo, or GenericInfo).
+        most specific admitted ParameterInfo subclass.
         """
         description = None
         resolved_info = parameter_info() if callable(parameter_info) else parameter_info
@@ -765,7 +744,7 @@ class ParameterFormService:
 
         # Use factory to create correct ParameterInfo subclass
         # Factory uses type introspection to determine which type to create
-        return create_parameter_info(
+        return ParameterInfo.create(
             name=param_name,
             param_type=param_type,
             current_value=current_value,

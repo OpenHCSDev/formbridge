@@ -8,7 +8,7 @@ from typing import Annotated
 import pytest
 
 from formbridge.forms.parameter_form_service import ParameterFormService
-from formbridge.forms.parameter_info_types import OptionalDataclassInfo, create_parameter_info
+from formbridge.forms.parameter_info_types import OptionalDataclassInfo, ParameterInfo
 from formbridge.forms.parameter_type_utils import ParameterTypeUtils
 
 
@@ -185,7 +185,7 @@ def test_pep604_optional_dataclass_uses_shared_optional_authority() -> None:
     assert ParameterTypeUtils.is_optional_dataclass(annotation)
     assert ParameterTypeUtils.get_optional_inner_type(annotation) is NestedConfig
     assert isinstance(
-        create_parameter_info("config", annotation, None),
+        ParameterInfo.create("config", annotation, None),
         OptionalDataclassInfo,
     )
 
