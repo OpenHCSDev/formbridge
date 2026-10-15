@@ -96,6 +96,7 @@ def test_group_heading_default_reads_the_objectstate_declaration() -> None:
 
 def test_field_consumers_group_name_and_convert_root_and_nested_addresses(monkeypatch) -> None:
     from objectstate import ObjectState, config
+    from python_introspect import UnifiedParameterAnalyzer
 
     from formbridge.bridge.dto import UiObjectStateFieldMutationRequest
     from formbridge.bridge.object_state import ObjectStateFieldMutationService
@@ -130,6 +131,10 @@ def test_field_consumers_group_name_and_convert_root_and_nested_addresses(monkey
         ("child", "child", " | "), ("{", None, ""),
         ("2", "child.value", ""), ("}", None, ""),
     ]
+    def reject_reanalysis(*_args, **_kwargs):
+        raise AssertionError("Conversion must use ObjectState's admitted declarations")
+
+    monkeypatch.setattr(UnifiedParameterAnalyzer, "analyze", reject_reanalysis)
     for address in ("value", "child.value"):
         preview = PreviewFieldFormatRequest(
             field_path=address, value=7, field_owner=state.type_for_path(address)
@@ -139,3 +144,13 @@ def test_field_consumers_group_name_and_convert_root_and_nested_addresses(monkey
             object_state_scope_id="scope", field_path=address, value="7"
         )
         assert ObjectStateFieldMutationService._converted_value(state, mutation) == 7
+
+    group_mutation = UiObjectStateFieldMutationRequest.from_fields(
+        object_state_scope_id="scope", field_path="child", value={"value": 7}
+    )
+    assert ObjectStateFieldMutationService._converted_value(state, group_mutation) == PreviewChild(7)
+    unknown = UiObjectStateFieldMutationRequest.from_fields(
+        object_state_scope_id="scope", field_path="unknown", value="untyped"
+    )
+    with pytest.raises(KeyError, match="unknown"):
+        ObjectStateFieldMutationService._converted_value(state, unknown)
