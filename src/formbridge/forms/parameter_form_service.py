@@ -24,6 +24,7 @@ from typing import Any, get_args, get_origin, get_type_hints
 
 from objectstate import (
     DataclassFieldAccess,
+    DottedFieldPath,
     LazyDefaultPlaceholderService,
     ObjectState,
     UIParameterVisibilityRequest,
@@ -134,8 +135,8 @@ class ParameterFormService:
 
     def parameters_for_state(
         self, state: ObjectState, parent_path: str = ""
-    ) -> Iterator[ParameterInfo]:
-        """Present admitted direct children without extracting a second form tree.
+    ) -> Iterator[tuple[DottedFieldPath, ParameterInfo]]:
+        """Present admitted paths and their kinds without extracting a second form tree.
 
         ObjectState owns the declarations, order and current values. This
         service owns UI visibility and field-kind selection, for every frontend.
@@ -147,7 +148,7 @@ class ParameterFormService:
             name = declaration.name
             if self._should_hide_from_ui(parent_type, name, declaration.param_type):
                 continue
-            yield create_parameter_info(
+            yield path, create_parameter_info(
                 name=name,
                 param_type=declaration.param_type,
                 current_value=state.get_resolved_value(path.value),
