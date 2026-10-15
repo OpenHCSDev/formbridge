@@ -305,7 +305,7 @@ class ParameterFormService:
         return field_obj.metadata.get("ui_hidden", False)
 
     def convert_value_to_type(
-        self, value: ParameterValue, param_type: type, param_name: str, obj_type: type = None
+        self, value: ParameterValue, param_type: type, param_name: str
     ) -> ParameterValue | None:
         """
         Convert a value to the appropriate type for a parameter.
@@ -317,7 +317,6 @@ class ParameterFormService:
             value: The value to convert
             param_type: The target parameter type
             param_name: The parameter name (for debugging)
-            obj_type: The dataclass type (for sibling inheritance checks)
 
         Returns:
             The converted value
