@@ -13,6 +13,7 @@ from collections.abc import (
     Callable as CallableABC,
 )
 from collections.abc import (
+    Iterator,
     Mapping as MappingABC,
 )
 from collections.abc import (
@@ -24,12 +25,14 @@ from typing import Any, get_args, get_origin, get_type_hints
 from objectstate import (
     DataclassFieldAccess,
     LazyDefaultPlaceholderService,
+    ObjectState,
     UIParameterVisibilityRequest,
     has_lazy_resolution,
     should_hide_ui_parameter,
 )
 from python_introspect import (
     AnnotationChoices,
+    UnifiedParameterAnalyzer,
     coerce_enum_member,
     declared_annotation_choices,
     is_union_type,
@@ -128,6 +131,30 @@ class ParameterFormService:
         Initialize the parameter form service.
         """
         self._type_utils = ParameterTypeUtils()
+
+    def parameters_for_state(
+        self, state: ObjectState, parent_path: str = ""
+    ) -> Iterator[ParameterInfo]:
+        """Present admitted direct children without extracting a second form tree.
+
+        ObjectState owns the declarations, order and current values. This
+        service owns UI visibility and field-kind selection, for every frontend.
+        The yielded information is consumed immediately, not retained as state.
+        """
+        parent_type = state.type_for_path(parent_path)
+        for path in state.direct_parameter_paths(parent_path):
+            declaration = state.parameter_structure.declarations[path.value]
+            name = declaration.name
+            if self._should_hide_from_ui(parent_type, name, declaration.param_type):
+                continue
+            yield create_parameter_info(
+                name=name,
+                param_type=declaration.param_type,
+                current_value=state.get_resolved_value(path.value),
+                default_value=declaration.default_value,
+                description=declaration.description,
+                is_required=declaration.is_required,
+            )
 
     def analyze_parameters(self, input: ParameterAnalysisInput) -> FormStructure:
         """
@@ -253,7 +280,8 @@ class ParameterFormService:
         )
 
     def _unwrap_optional_dataclass_type(self, param_type: type) -> type:
-        """Return the dataclass type behind Optional[T], or the type itself."""
+        """Return the structural type, retaining metadata on the declaration."""
+        param_type = resolve_annotated(param_type)
         if self._type_utils.is_optional_dataclass(param_type):
             return self._type_utils.get_optional_inner_type(param_type)
         return param_type
@@ -707,26 +735,14 @@ class ParameterFormService:
         parameters = ParameterDefaultsByName()
         parameter_types = ParameterTypesByName()
 
-        for field in dataclasses.fields(obj_type):
-            # Always extract actual field values when dataclass instance exists
-            # This preserves concrete user-entered values in nested lazy dataclass forms
-            if dataclass_instance is not None:
-                current_value = self._get_field_value(dataclass_instance, field)
-            else:
-                current_value = None  # Only use None when no instance exists
-
-            parameters[field.name] = current_value
-            parameter_types[field.name] = field.type
+        for name, declaration in UnifiedParameterAnalyzer.analyze(obj_type).items():
+            parameters[name] = (
+                DataclassFieldAccess.raw_value(dataclass_instance, name)
+                if dataclass_instance is not None else None
+            )
+            parameter_types[name] = declaration.param_type
 
         return parameters, parameter_types
-
-    def _get_field_value(
-        self, dataclass_instance: FormObject | None, field: dataclasses.Field
-    ) -> ParameterValue:
-        """Extract a single field value from a dataclass instance."""
-        if dataclass_instance is None:
-            return field.default
-        return DataclassFieldAccess.raw_value(dataclass_instance, field.name)
 
     def _create_parameter_info(
         self,
@@ -756,9 +772,6 @@ class ParameterFormService:
             description=description,
         )
 
-    # Class-level cache for nested dataclass parameter info (descriptions only)
-    _nested_param_info_cache = {}
-
     def _analyze_nested_dataclass(
         self,
         param_name: str,
@@ -768,31 +781,15 @@ class ParameterFormService:
         parent_obj_type: type = None,
     ) -> FormStructure:
         """Analyze a nested dataclass parameter."""
-        # Get the actual dataclass type
-        if self._type_utils.is_optional_dataclass(param_type):
-            obj_type = self._type_utils.get_optional_inner_type(param_type)
-        else:
-            obj_type = param_type
+        obj_type = self._unwrap_optional_dataclass_type(param_type)
 
         # Extract nested parameters using parent context
         nested_params, nested_types = self.extract_nested_parameters(
             current_value, obj_type, parent_obj_type
         )
 
-        # OPTIMIZATION: Cache parameter info (descriptions) by dataclass type
-        # We only need descriptions, not instance values, so analyze the type once and reuse
-        cache_key = obj_type
-        if cache_key in self._nested_param_info_cache:
-            nested_param_info = self._nested_param_info_cache[cache_key]
-        else:
-            # Recursively analyze nested structure with proper descriptions for nested fields
-            # Use existing infrastructure to extract field descriptions for the nested dataclass
-            from python_introspect import UnifiedParameterAnalyzer
-
-            # OPTIMIZATION: Always analyze the TYPE, not the instance
-            # This allows caching and avoids extracting field values we don't need
-            nested_param_info = UnifiedParameterAnalyzer.analyze(obj_type)
-            self._nested_param_info_cache[cache_key] = nested_param_info
+        # SignatureAnalyzer owns declaration caching and lazy help materialization.
+        nested_param_info = UnifiedParameterAnalyzer.analyze(obj_type)
 
         # Create type-safe input for recursive analysis
         # CRITICAL FIX: Use dotted paths for descriptions to match state._parameter_descriptions

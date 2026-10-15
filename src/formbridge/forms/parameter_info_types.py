@@ -45,7 +45,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, is_dataclass
 
 from objectstate.lazy_factory import get_base_type_for_lazy
-from python_introspect import optional_member_type
+from python_introspect import optional_member_type, resolve_annotated
 
 from formbridge.forms.parameter_value_contracts import ParameterValue
 
@@ -340,9 +340,10 @@ def create_parameter_info(
         >>> type(info3).__name__
         'GenericInfo'
     """
-    # Iterate through registered types and find first match
+    # Match structural identity once; the admitted declaration keeps its metadata.
+    structural_type = resolve_annotated(param_type)
     for info_class in ParameterInfoMeta.get_registry():
-        if info_class.matches(param_type):
+        if info_class.matches(structural_type):
             return info_class(
                 name=name,
                 type=param_type,
