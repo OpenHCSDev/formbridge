@@ -9,7 +9,7 @@ from dataclasses import dataclass, is_dataclass
 from enum import Enum
 from typing import ClassVar
 
-from objectstate import ObjectState, ObjectStateRegistry
+from objectstate import DottedFieldPath, ObjectState, ObjectStateRegistry
 from objectstate.inspection import FieldInspection, type_name, type_qualname
 from python_introspect import (
     JsonValue,
@@ -541,7 +541,7 @@ class ObjectStateFieldMutationService:
         request: UiObjectStateFieldMutationRequest,
     ) -> object:
         help_target = state.type_for_path(request.field_path)
-        parameter_name = request.field_path.rsplit(".", 1)[-1]
+        parameter_name = DottedFieldPath(request.field_path).field_name
         parameter_info = UnifiedParameterAnalyzer.analyze(help_target).get(parameter_name)
         if parameter_info is None:
             return request.value

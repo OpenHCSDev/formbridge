@@ -94,8 +94,12 @@ def test_group_heading_default_reads_the_objectstate_declaration() -> None:
     assert heading(lazy_type) == "cfg"
 
 
-def test_preview_groups_root_and_nested_fields_by_their_dotted_parent(monkeypatch) -> None:
+def test_field_consumers_group_name_and_convert_root_and_nested_addresses(monkeypatch) -> None:
     from objectstate import ObjectState, config
+
+    from formbridge.bridge.dto import UiObjectStateFieldMutationRequest
+    from formbridge.bridge.object_state import ObjectStateFieldMutationService
+    from formbridge.utils.preview_formatters import PreviewFieldFormatRequest
 
     from formbridge.strategies.preview_formatting import (
         FormattingConfig,
@@ -126,3 +130,12 @@ def test_preview_groups_root_and_nested_fields_by_their_dotted_parent(monkeypatc
         ("child", "child", " | "), ("{", None, ""),
         ("2", "child.value", ""), ("}", None, ""),
     ]
+    for address in ("value", "child.value"):
+        preview = PreviewFieldFormatRequest(
+            field_path=address, value=7, field_owner=state.type_for_path(address)
+        )
+        assert preview.field_name == "value"
+        mutation = UiObjectStateFieldMutationRequest.from_fields(
+            object_state_scope_id="scope", field_path=address, value="7"
+        )
+        assert ObjectStateFieldMutationService._converted_value(state, mutation) == 7
