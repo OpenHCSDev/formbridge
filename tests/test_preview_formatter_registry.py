@@ -1,6 +1,6 @@
 """Preview formatter registration behavior."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pytest
 from objectstate.lazy_factory import LazyDataclassFactory
@@ -92,3 +92,37 @@ def test_group_heading_default_reads_the_objectstate_declaration() -> None:
     assert heading(HeadedConfig) == "cfg"
     assert heading(SpecializedHeadedConfig) == "cfg"
     assert heading(lazy_type) == "cfg"
+
+
+def test_preview_groups_root_and_nested_fields_by_their_dotted_parent(monkeypatch) -> None:
+    from objectstate import ObjectState, config
+
+    from formbridge.strategies.preview_formatting import (
+        FormattingConfig,
+        ObjectStatePreviewFormattingService,
+    )
+
+    @dataclass
+    class PreviewChild:
+        value: int = 2
+
+    @dataclass
+    class PreviewRoot:
+        value: int = 1
+        child: PreviewChild = field(default_factory=PreviewChild)
+
+    monkeypatch.setattr(config, "_base_config_type", PreviewRoot)
+    state = ObjectState(PreviewRoot())
+    service = ObjectStatePreviewFormattingService(
+        FormattingConfig(container_abbr_func=lambda _owner: "child")
+    )
+
+    segments = service.collect_and_render(
+        state, ("value", "child.value"), {}, lambda request: str(request.value)
+    )
+
+    assert segments == [
+        ("root", None, ""), ("{", None, ""), ("1", "value", ""), ("}", None, ""),
+        ("child", "child", " | "), ("{", None, ""),
+        ("2", "child.value", ""), ("}", None, ""),
+    ]
