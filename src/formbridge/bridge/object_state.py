@@ -168,9 +168,7 @@ class ObjectStateFieldSemanticProjection(FieldInspection):
 
     @property
     def resolved_json_value(self) -> JsonValue | None:
-        if not self.resolved_value_available:
-            return None
-        return self.json_value(self.resolved_value)
+        return self.resolved.project(self.json_value)
 
     @property
     def raw_value_preview(self) -> UiObjectStateValuePreview:
@@ -178,9 +176,7 @@ class ObjectStateFieldSemanticProjection(FieldInspection):
 
     @property
     def resolved_value_preview(self) -> UiObjectStateValuePreview | None:
-        if not self.resolved_value_available:
-            return None
-        return self.value_preview(self.resolved_value)
+        return self.resolved.project(self.value_preview)
 
     def semantic_address(self, *, window_id: str | None = None) -> UiSemanticAddress:
         return UiSemanticAddress(
