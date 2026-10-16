@@ -5,14 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass, fields
 
 from objectstate import DataclassFieldAccess
-from objectstate.lazy_factory import get_base_type_for_lazy, replace_raw
+from objectstate.lazy_factory import replace_raw
+from objectstate.field_value import FieldValue
+from python_introspect import resolve_declared_type
 
 
 @dataclass(frozen=True, slots=True)
 class RawDisplayValue:
     """One dataclass value as edited (``raw``) and as shown (``display``).
 
-    ``raw`` holds what this owner declares: an unset field is ``None`` there.
+    ``raw`` preserves literal null, inheritance and absence as distinct meanings.
     ``display`` is the same value with inherited fields filled in. Keeping the
     two in one record keeps the question "did this owner supply the field, or
     was it inherited" answerable for every field (:meth:`shows_inherited`).
@@ -38,7 +40,7 @@ class RawDisplayValue:
         return cls(value_type, raw, raw)
 
     def _declared_type(self, value: object) -> type:
-        declared = get_base_type_for_lazy(type(value)) or type(value)
+        declared = resolve_declared_type(type(value))
         if not issubclass(declared, self.value_type):
             raise TypeError(
                 f"Expected {self.value_type.__name__}, got {type(value).__name__}."
@@ -65,8 +67,8 @@ class RawDisplayValue:
         """Whether the shown field was inherited rather than declared here."""
 
         return (
-            self.raw_field(field_name) is None
-            and self.display_field(field_name) is not None
+            FieldValue.is_inherited(self.raw_field(field_name))
+            and not FieldValue.is_inherited(self.display_field(field_name))
         )
 
     def field_default(self, field_name: str) -> object:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from math import isfinite
@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, ClassVar, TypeVar
 
 from metaclass_registry import AutoRegisterMeta
 from objectstate import DottedFieldPath
+from objectstate.field_value import FieldValue, Unset
 from python_introspect import (
     JsonObject,
     JsonValue,
@@ -48,7 +49,6 @@ from formbridge.selection import (
     SelectionModeCarrier,
 )
 from formbridge.services.widget_tree_projection_config import (
-    COMPACT_FIELD_PROJECTION_METADATA_KEY,
     CompactFieldProjection,
     WidgetNodeIdentity,
     WidgetTreeProjectionControls,
@@ -303,7 +303,7 @@ class RawResolvedFields(UiObjectStateFieldFilter):
 
     @classmethod
     def matches(cls, field: UiObjectStateFieldSummary) -> bool:
-        return field.raw_value_is_none != field.resolved_value_is_none
+        return field.inherited_value
 
 
 class SemanticFields(UiObjectStateFieldFilter):
@@ -1352,42 +1352,70 @@ class UiWidgetRect:
     height: int
 
 
-@dataclass(frozen=True, slots=True)
-class UiObjectStateValuePreview:
-    """Bounded display preview for an ObjectState field value."""
+@dataclass(frozen=True)
+class UiObjectStateValuePreview(ABC):
+    """A preview renders itself; absence never impersonates a null datum."""
 
-    type_name: str
-    is_none: bool
+    @abstractmethod
+    def render(self, value: FieldValue, format_value: Callable[[object], str]) -> str:
+        """Render this preview or request a display projection of the value."""
+
+
+@dataclass(frozen=True)
+class UiObjectStateNoPreview(UiObjectStateValuePreview):
+    def render(self, value: FieldValue, format_value: Callable[[object], str]) -> str:
+        return value.project(format_value)
+
+
+@dataclass(frozen=True)
+class UiObjectStateTextPreview(UiObjectStateValuePreview):
     text: str
     truncated: bool = False
+
+    def render(self, value: FieldValue, format_value: Callable[[object], str]) -> str:
+        return self.text
+
+
+@dataclass(frozen=True, slots=True)
+class UiObjectStateFieldDeclaration:
+    """The declaring Python symbol, independent of a field's current datum.
+
+    Remote documentation needs this address even for absent or null values.
+    Import resolution belongs here, not in consumers parsing display strings.
+    """
+
+    module: str
+    qualname: str
+
+    @classmethod
+    def of(cls, owner) -> UiObjectStateFieldDeclaration:
+        return cls(module=owner.__module__, qualname=owner.__qualname__)
+
+    @property
+    def import_path(self) -> str:
+        return f"{self.module}.{self.qualname}"
+
+    @property
+    def display_name(self) -> str:
+        return self.qualname.rsplit(".", 1)[-1]
+
+    def resolve(self):
+        from importlib import import_module
+
+        symbol = import_module(self.module)
+        for name in self.qualname.split("."):
+            symbol = vars(symbol)[name]
+        if not callable(symbol):
+            raise TypeError(f"Declaration is not a class or callable: {self.import_path!r}")
+        return symbol
 
 
 @dataclass(frozen=True, kw_only=True)
 class UiObjectStateFieldValuePreviewCarrier:
     """Shared raw/resolved value previews for ObjectState-aware UI DTOs."""
 
-    raw_value_is_none: bool = False
-    resolved_value_is_none: bool = False
-    raw_value_preview: UiObjectStateValuePreview | None = field(
-        default=None,
-        metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
-                includes=lambda owner, field_value: (
-                    field_value is not None or owner.raw_value_is_none
-                )
-            )
-        },
-    )
-    resolved_value_preview: UiObjectStateValuePreview | None = field(
-        default=None,
-        metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
-                includes=lambda owner, field_value: (
-                    field_value is not None or owner.resolved_value_is_none
-                )
-            )
-        },
-    )
+    raw_value_preview: UiObjectStateValuePreview = field(default_factory=UiObjectStateNoPreview)
+    resolved_value_preview: UiObjectStateValuePreview = field(default_factory=UiObjectStateNoPreview)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -1398,8 +1426,8 @@ class UiObjectStateFieldSemanticCarrier(UiObjectStateFieldValuePreviewCarrier):
     signature_diff: bool = False
     last_changed: bool = False
     semantic_markers: tuple[str, ...] = ()
-    raw_value: JsonValue | None = None
-    resolved_value: JsonValue | None = None
+    raw_value: FieldValue = field(default_factory=Unset)
+    resolved_value: FieldValue = field(default_factory=Unset)
     inherited_value: bool = False
     provenance: UiObjectStateFieldProvenance | None = None
 
@@ -1443,49 +1471,49 @@ class UiWidgetTreeNode(WidgetNodeIdentity):
 class UiWidgetActionSummary(UiWidgetActionSemanticCarrier, WidgetNodeIdentity):
     label: str | None = field(
         metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
+            CompactFieldProjection: CompactFieldProjection(
                 includes=always_project_compact_field
             )
         }
     )
     visible: bool = field(
         metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
+            CompactFieldProjection: CompactFieldProjection(
                 includes=always_project_compact_field
             )
         }
     )
     enabled: bool = field(
         metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
+            CompactFieldProjection: CompactFieldProjection(
                 includes=always_project_compact_field
             )
         }
     )
     geometry: UiWidgetRect = field(
         metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
+            CompactFieldProjection: CompactFieldProjection(
                 includes=always_project_compact_field
             )
         }
     )
     global_geometry: UiWidgetRect = field(
         metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
+            CompactFieldProjection: CompactFieldProjection(
                 includes=always_project_compact_field
             )
         }
     )
     action_kinds: tuple[str, ...] = field(
         metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
+            CompactFieldProjection: CompactFieldProjection(
                 includes=always_project_compact_field
             )
         }
     )
     clickable: bool = field(
         metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
+            CompactFieldProjection: CompactFieldProjection(
                 includes=always_project_compact_field
             )
         }
@@ -1493,7 +1521,7 @@ class UiWidgetActionSummary(UiWidgetActionSemanticCarrier, WidgetNodeIdentity):
     checkable: bool | None
     checked: bool | None = field(
         metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
+            CompactFieldProjection: CompactFieldProjection(
                 includes=lambda owner, field_value: (
                     isinstance(field_value, bool) and (field_value or owner.checkable is True)
                 )
@@ -1506,35 +1534,15 @@ class UiWidgetActionSummary(UiWidgetActionSemanticCarrier, WidgetNodeIdentity):
     tool_tip: str
     item_texts: tuple[str, ...] = ()
     context_label: str | None = None
-    raw_value: JsonValue | None = field(
-        default=None,
-        metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
-                includes=lambda owner, field_value: (
-                    owner.raw_value_preview is None
-                    and (field_value is not None or owner.raw_value_is_none)
-                )
-            )
-        },
-    )
-    resolved_value: JsonValue | None = field(
-        default=None,
-        metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
-                includes=lambda owner, field_value: (
-                    owner.resolved_value_preview is None
-                    and (field_value is not None or owner.resolved_value_is_none)
-                )
-            )
-        },
-    )
-
     def compact_projection(self) -> JsonObject:
         """Return the field-declaration-owned compact action projection."""
 
+        # Serialize through declared field types before selecting compact keys;
+        # serializing detached values would erase their member-family tags.
+        payload = to_jsonable(self)
         return {
-            field_name: to_jsonable(field_value)
-            for field_name, field_value in compact_dataclass_projection(self).items()
+            field_name: payload[field_name]
+            for field_name in compact_dataclass_projection(self)
         }
 
 
@@ -1684,7 +1692,6 @@ class UiObjectStateFieldProvenance:
     """Resolved source address for an inherited ObjectState field."""
 
     source_scope_id: str | None
-    source_type: str | None
     source_field_path: str | None = None
 
 
@@ -1696,9 +1703,7 @@ class UiObjectStateFieldSummary(UiObjectStateFieldSemanticCarrier):
     address: UiSemanticAddress
     field_name: str
     container_path: str
-    object_state_path_type: str
-    raw_value_type: str
-    resolved_value_type: str | None
+    declared_by: UiObjectStateFieldDeclaration
     parameter_description: str | None = None
 
 
@@ -1791,8 +1796,6 @@ class UiObjectStateFieldHelpResult(AgentResultEnvelope):
 
     address: UiSemanticAddress
     field: UiObjectStateFieldSummary | None = None
-    object_type: str | None = None
-    help_target_type: str | None = None
     parameter_name: str | None = None
     target_summary: str | None = None
     target_description: str | None = None
@@ -1869,7 +1872,6 @@ class UiObjectStateFieldMutationResult(AgentResultEnvelope):
 class UiObjectStateScopeSummary(UiFieldCatalogPageCarrier):
     schema_version: str
     identity: UiObjectStateScopeIdentity
-    object_type: str
     parameter_count: int
     dirty_field_count: int
     signature_diff_field_count: int
@@ -1989,9 +1991,7 @@ class UiObjectStateFieldProjection(UiObjectStateFieldSemanticCarrier):
     field_path: str
     field_name: str
     container_path: str
-    object_state_path_type: str
-    raw_value_type: str
-    resolved_value_type: str | None
+    declared_by: UiObjectStateFieldDeclaration
 
 
 @dataclass(frozen=True, slots=True)
@@ -1999,7 +1999,6 @@ class UiObjectStateFieldScopeProjection:
     """Compact ObjectState scope row for field-list query results."""
 
     scope_id: str
-    object_type: str
     dirty_field_count: int
     signature_diff_field_count: int
     has_unsaved_changes: bool

@@ -28,9 +28,9 @@ class PreviewFieldAbbreviationResolution:
 
 def canonical_declaration_mro(declaration_type: type) -> tuple[type, ...]:
     """Return the semantic declaration MRO, excluding generated lazy wrappers."""
-    from objectstate.lazy_factory import get_base_type_for_lazy
+    from python_introspect import resolve_declared_type
 
-    canonical_type = get_base_type_for_lazy(declaration_type) or declaration_type
+    canonical_type = resolve_declared_type(declaration_type)
     return canonical_type.__mro__
 
 

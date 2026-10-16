@@ -1,6 +1,7 @@
 """Preview field formatting for manager list items."""
 
-from dataclasses import is_dataclass
+from objectstate.declarations import ValueDeclaration
+from formbridge.protocols.preview_formatter import PreviewFormatterRegistry
 
 from formbridge.utils.preview_formatters import (
     PreviewFieldFormatRequest,
@@ -15,12 +16,12 @@ class ManagerPreviewFieldFormatter:
 
     def format_field(self, request: PreviewFieldFormatRequest) -> str | None:
         """Format a value using metadata from its actual declaring type."""
+        declaration = ValueDeclaration.of(request.field_owner).owner_scope.field_types[request.field_name]
+        return declaration.admit(request.value).render_preview(self, request)
+
+    def scalar_preview(self, request):
         if request.value is None:
             return None
-
-        if is_dataclass(request.value) and not isinstance(request.value, type):
-            return self._format_dataclass_value(request)
-
         formatted = request.value_formatter(request.value)
         if formatted is None:
             return None
@@ -31,9 +32,7 @@ class ManagerPreviewFieldFormatter:
         abbrev = abbreviation.abbreviation if abbreviation is not None else request.field_name
         return f"{abbrev}:{formatted}"
 
-    def _format_dataclass_value(self, request: PreviewFieldFormatRequest) -> str | None:
-        from formbridge.protocols.preview_formatter import PreviewFormatterRegistry
-
+    def configuration_preview(self, request: PreviewFieldFormatRequest) -> str | None:
         formatted = PreviewFormatterRegistry.format_field(request.value, request.field_name)
         if formatted is None:
             formatted = self._preview_label_for_config(request.value)

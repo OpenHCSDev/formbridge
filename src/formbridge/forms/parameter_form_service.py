@@ -7,6 +7,9 @@ shared business logic and data management.
 
 Uses React-style discriminated unions for type-safe parameter handling.
 """
+from objectstate.field_value import Unset
+from objectstate.declarations import ValueDeclaration
+from objectstate.construction_binding import admit_target
 
 import dataclasses
 from collections.abc import (
@@ -25,6 +28,7 @@ from objectstate import (
     DataclassFieldAccess,
     LazyDefaultPlaceholderService,
     UIParameterVisibilityRequest,
+    UIParameterVisibilityPolicy,
     has_lazy_resolution,
     should_hide_ui_parameter,
 )
@@ -34,6 +38,7 @@ from python_introspect import (
     declared_annotation_choices,
     is_union_type,
     resolve_annotated,
+    resolve_optional,
 )
 
 from formbridge.forms.parameter_form_constants import CONSTANTS
@@ -92,7 +97,9 @@ class FormStructure:
     field_id: str
     parameters: list[ParameterInfo]
     nested_forms: dict[str, "FormStructure"]
-    has_optional_dataclasses: bool = False
+    @property
+    def has_optional_dataclasses(self) -> bool:
+        return any(info.optional_parameters() for info in self.parameters)
 
     def get_parameter_info(self, param_name: str) -> ParameterInfo | None:
         """
@@ -130,98 +137,18 @@ class ParameterFormService:
         self._type_utils = ParameterTypeUtils()
 
     def analyze_parameters(self, input: ParameterAnalysisInput) -> FormStructure:
-        """
-        Analyze parameters and create form structure.
-
-        This method analyzes the parameters and their types to create a complete
-        form structure that can be used by any UI framework.
-
-        Args:
-            input: Type-safe parameter analysis input (field names match UnifiedParameterInfo)
-
-        Returns:
-            Complete form structure information
-        """
-        debug_param(
-            "analyze_parameters",
-            f"field_id={input.field_id}, parameter_count={len(input.default_value)}",
-        )
-
-        import logging
-
-        logger = logging.getLogger(__name__)
-        logger.debug(
-            "analyze_parameters: field_id=%s param_type.keys()=%s",
-            input.field_id,
-            list(input.param_type.keys()),
-        )
-
-        param_infos = []
+        parameters = []
         nested_forms = {}
-        has_optional_dataclasses = False
-
-        for param_name, parameter_type in input.param_type.items():
-            current_value = input.default_value.get(param_name)
-
-            # Check if this parameter should be hidden from UI
-            if self._should_hide_from_ui(input.parent_obj_type, param_name, parameter_type):
-                debug_param(
-                    "analyze_parameters", f"Hiding parameter {param_name} from UI (ui_hidden=True)"
-                )
+        for name, annotation in input.param_type.items():
+            if self._should_hide_from_ui(input.parent_obj_type, name, annotation):
                 continue
-
-            # CRITICAL FIX: Build full dotted path for description lookup
-            # When nested_field_id is set (e.g., "well_filter_config"), pass the full
-            # dotted path to _create_parameter_info so it builds the key that
-            # state._parameter_descriptions uses (dotted paths).
-            full_param_path = f"{input.field_id}.{param_name}" if input.field_id else param_name
-
-            # Create parameter info with full dotted path
-            param_info = self._create_parameter_info(
-                param_name, parameter_type, current_value, input.description, full_param_path
+            full_path = f"{input.field_id}.{name}" if input.field_id else name
+            info = self._create_parameter_info(
+                name, annotation, input.default_value.get(name, Unset()), input.description, full_path,
             )
-            param_infos.append(param_info)
-
-            # Check for nested dataclasses using isinstance (type-safe!)
-            from formbridge.forms.parameter_info_types import (
-                DirectDataclassInfo,
-                OptionalDataclassInfo,
-            )
-
-            if isinstance(param_info, (OptionalDataclassInfo, DirectDataclassInfo)):
-                # Get actual field path from FieldPathDetector (no artificial "nested_" prefix)
-                # Unwrap Optional types to get the actual dataclass type for field path detection
-                unwrapped_param_type = self._unwrap_optional_dataclass_type(parameter_type)
-
-                # For function parameters (no parent dataclass), use parameter name directly
-                if input.parent_obj_type is None:
-                    nested_field_id = param_name
-                else:
-                    nested_field_id = self.resolve_declared_field_path(
-                        input.parent_obj_type,
-                        param_name,
-                        unwrapped_param_type,
-                    )
-
-                nested_structure = self._analyze_nested_dataclass(
-                    param_name,
-                    parameter_type,
-                    current_value,
-                    nested_field_id,
-                    input.parent_obj_type,
-                )
-                nested_forms[param_name] = nested_structure
-
-            # Check for optional dataclasses using isinstance (type-safe!)
-            if isinstance(param_info, OptionalDataclassInfo):
-                has_optional_dataclasses = True
-
-        return FormStructure(
-            field_id=input.field_id,
-            parameters=param_infos,
-            nested_forms=nested_forms,
-            has_optional_dataclasses=has_optional_dataclasses,
-        )
+            parameters.append(info)
+            nested_forms.update(info.nested_forms(self, input))
+        return FormStructure(field_id=input.field_id, parameters=parameters, nested_forms=nested_forms)
 
     def _should_hide_from_ui(
         self,
@@ -244,7 +171,7 @@ class ParameterFormService:
             UIParameterVisibilityRequest(
                 owner_type=parent_obj_type,
                 field_name=param_name,
-                field_type_candidate=self._unwrap_optional_dataclass_type(param_type),
+                field_type_candidate=resolve_optional(resolve_annotated(param_type)),
                 field_metadata_hidden=self._field_metadata_declares_hidden(
                     parent_obj_type,
                     param_name,
@@ -252,30 +179,21 @@ class ParameterFormService:
             )
         )
 
-    def _unwrap_optional_dataclass_type(self, param_type: type) -> type:
-        """Return the dataclass type behind Optional[T], or the type itself."""
-        if self._type_utils.is_optional_dataclass(param_type):
-            return self._type_utils.get_optional_inner_type(param_type)
-        return param_type
 
-    def _field_metadata_declares_hidden(
-        self,
-        parent_obj_type: type | None,
-        param_name: str,
-    ) -> bool:
-        """Return True when a dataclass field carries UI-hidden metadata."""
-        if parent_obj_type is None:
-            return False
-        if not dataclasses.is_dataclass(parent_obj_type):
-            return False
-
-        field_by_name = {field.name: field for field in dataclasses.fields(parent_obj_type)}
-        field_obj = field_by_name.get(param_name)
-        if field_obj is None:
-            return False
-        return field_obj.metadata.get("ui_hidden", False)
+    def _field_metadata_declares_hidden(self, parent_obj_type, param_name) -> bool:
+        return any(item.name == param_name and UIParameterVisibilityPolicy.field_hidden(item)
+                   for owner in ValueDeclaration.of(parent_obj_type).configuration_owners()
+                   for item in owner.declared_fields())
 
     def convert_value_to_type(
+        self, value: ParameterValue, param_type: type, param_name: str, obj_type: type = None
+    ) -> ParameterValue:
+        """Convert domain input through its annotation; retain field directives."""
+        return ValueDeclaration.of(param_type).admit(value).map(
+            lambda raw: self._convert_domain_value(raw, param_type, param_name, obj_type)
+        )
+
+    def _convert_domain_value(
         self, value: ParameterValue, param_type: type, param_name: str, obj_type: type = None
     ) -> ParameterValue | None:
         """
@@ -300,10 +218,6 @@ class ParameterFormService:
         )
 
         if value is None:
-            return None
-
-        # Handle string "None" literal
-        if isinstance(value, str) and value == CONSTANTS.NONE_STRING_LITERAL:
             return None
 
         choices = declared_annotation_choices(param_type)
@@ -337,7 +251,7 @@ class ParameterFormService:
             return self._type_utils.convert_string_to_bool(value)
         if resolved_type in (int, float) and isinstance(value, str):
             if value == CONSTANTS.EMPTY_STRING:
-                return None
+                return Unset()
             try:
                 return resolved_type(value)
             except (ValueError, TypeError) as exc:
@@ -345,15 +259,6 @@ class ParameterFormService:
                     f"Invalid {resolved_type.__name__} value for parameter "
                     f"{param_name!r}: {value!r}"
                 ) from exc
-
-        # Handle empty strings in lazy context - convert to None for all parameter types
-        # This is critical for lazy dataclass behavior where None triggers placeholder resolution
-        if isinstance(value, str) and value == CONSTANTS.EMPTY_STRING:
-            return None
-
-        # Handle string types - also convert empty strings to None for consistency
-        if resolved_type is str and isinstance(value, str) and value == CONSTANTS.EMPTY_STRING:
-            return None
 
         return value
 
@@ -384,18 +289,16 @@ class ParameterFormService:
                 return value
             return coerce_enum_member(param_type, value)
 
-        if dataclasses.is_dataclass(param_type):
-            return self._convert_dataclass_value(value, param_type, param_name)
+        return ValueDeclaration.of(param_type).convert_structure(self, value, param_name)
 
+    def convert_leaf_structure(self, value, param_type, param_name):
+        origin = get_origin(param_type)
         if origin in (tuple, SequenceABC):
             return self._convert_tuple_value(value, param_type, param_name)
-
         if origin is list:
             return self._convert_list_value(value, param_type, param_name)
-
         if origin in (dict, MappingABC):
             return self._convert_dict_value(value, param_type, param_name)
-
         return _NO_CONVERSION
 
     @staticmethod
@@ -457,41 +360,6 @@ class ParameterFormService:
             f"expected {_type_label(param_type)}, got {type(value).__name__}."
         )
 
-    def _convert_dataclass_value(
-        self,
-        value: ParameterValue,
-        dataclass_type: type,
-        param_name: str,
-    ) -> ParameterValue | object:
-        if isinstance(value, dataclass_type):
-            return value
-        if not isinstance(value, dict):
-            return _NO_CONVERSION
-
-        try:
-            type_hints = get_type_hints(dataclass_type, include_extras=True)
-        except Exception:
-            type_hints = {}
-
-        kwargs = {}
-        for field in dataclasses.fields(dataclass_type):
-            if field.name not in value:
-                continue
-            field_value = value[field.name]
-            field_type = type_hints.get(field.name, field.type)
-            converted = self._convert_value_by_annotation(
-                field_value,
-                field_type,
-                field.name,
-            )
-            kwargs[field.name] = field_value if converted is _NO_CONVERSION else converted
-
-        try:
-            return dataclass_type(**kwargs)
-        except Exception as exc:
-            raise ValueError(
-                f"Invalid dataclass value for parameter {param_name!r}: {value!r}"
-            ) from exc
 
     def _convert_tuple_value(
         self,
@@ -620,34 +488,6 @@ class ParameterFormService:
             "tooltip": f"{text.display_name} ({_type_label(param_type)})",
         }
 
-    def resolve_declared_field_path(
-        self,
-        parent_type: type,
-        param_name: str,
-        param_type: type,
-    ) -> str:
-        """Validate and return the already-declared nested field name."""
-        if not param_name:
-            raise ValueError("Nested form field name cannot be empty.")
-
-        if not dataclasses.is_dataclass(parent_type):
-            return param_name
-
-        try:
-            field_types = get_type_hints(parent_type)
-        except Exception as exc:
-            raise ValueError(f"Cannot resolve declared fields for {parent_type!r}.") from exc
-
-        if param_name not in field_types:
-            raise ValueError(f"{parent_type.__name__} has no declared field {param_name!r}.")
-
-        declared_type = self._unwrap_optional_dataclass_type(field_types[param_name])
-        if declared_type is not param_type:
-            raise ValueError(
-                f"{parent_type.__name__}.{param_name} declares "
-                f"{_type_label(declared_type)}, not {_type_label(param_type)}."
-            )
-        return param_name
 
     def generate_field_ids_direct(self, base_field_id: str, param_name: str) -> dict[str, str]:
         """Generate field IDs directly without artificial complexity."""
@@ -659,74 +499,18 @@ class ParameterFormService:
             "optional_checkbox_id": f"{base_field_id}_{param_name}_enabled",
         }
 
-    def should_use_concrete_values(
-        self, current_value: ParameterValue | None, is_global_editing: bool = False
-    ) -> bool:
-        """
-        Determine whether to use concrete values for a dataclass parameter.
 
-        Args:
-            current_value: The current parameter value
-            is_global_editing: Whether in global configuration editing mode
-
-        Returns:
-            True if concrete values should be used
-        """
-        if current_value is None:
-            return False
-
-        if is_global_editing:
-            return True
-
-        # If current_value is a concrete dataclass instance, use its values
-        if self._type_utils.is_concrete_dataclass(current_value):
-            return True
-
-        # For lazy dataclasses, return True so we can extract raw values from them
-        if self._type_utils.is_lazy_dataclass(current_value):
-            return True
-
-        return False
-
-    def extract_nested_parameters(
-        self,
-        dataclass_instance: FormObject | None,
-        obj_type: type,
-        parent_obj_type: type | None = None,
-    ) -> tuple[ParameterDefaultsByName, ParameterTypesByName]:
-        """
-        Extract parameters and types from a dataclass instance.
-
-        This method always preserves concrete field values when a dataclass instance exists,
-        regardless of parent context. Placeholder behavior is handled at the widget level,
-        not by discarding concrete values during parameter extraction.
-        """
-        if not dataclasses.is_dataclass(obj_type):
-            return ParameterDefaultsByName(), ParameterTypesByName()
-
+    def extract_nested_parameters(self, dataclass_instance, obj_type, parent_obj_type=None):
+        source = admit_target(dataclass_instance)
+        declaration = ValueDeclaration.of(obj_type)
         parameters = ParameterDefaultsByName()
         parameter_types = ParameterTypesByName()
-
-        for field in dataclasses.fields(obj_type):
-            # Always extract actual field values when dataclass instance exists
-            # This preserves concrete user-entered values in nested lazy dataclass forms
-            if dataclass_instance is not None:
-                current_value = self._get_field_value(dataclass_instance, field)
-            else:
-                current_value = None  # Only use None when no instance exists
-
-            parameters[field.name] = current_value
-            parameter_types[field.name] = field.type
-
+        annotations = declaration.field_annotations()
+        for name in source.declaration.parameters:
+            parameters[name] = source.read_raw(name).stored
+            parameter_types[name] = annotations[name]
         return parameters, parameter_types
 
-    def _get_field_value(
-        self, dataclass_instance: FormObject | None, field: dataclasses.Field
-    ) -> ParameterValue:
-        """Extract a single field value from a dataclass instance."""
-        if dataclass_instance is None:
-            return field.default
-        return DataclassFieldAccess.raw_value(dataclass_instance, field.name)
 
     def _create_parameter_info(
         self,
@@ -769,10 +553,7 @@ class ParameterFormService:
     ) -> FormStructure:
         """Analyze a nested dataclass parameter."""
         # Get the actual dataclass type
-        if self._type_utils.is_optional_dataclass(param_type):
-            obj_type = self._type_utils.get_optional_inner_type(param_type)
-        else:
-            obj_type = param_type
+        obj_type = resolve_optional(resolve_annotated(param_type))
 
         # Extract nested parameters using parent context
         nested_params, nested_types = self.extract_nested_parameters(
@@ -848,102 +629,3 @@ class ParameterFormService:
         for nested_manager in nested_managers.values():
             # All nested managers must have reset_all_parameters method
             nested_manager.reset_all_parameters()
-
-    def get_reset_value_for_parameter(
-        self,
-        param_name: str,
-        param_type: type,
-        obj_type: type,
-        is_global_config_editing: bool | None = None,
-    ) -> ParameterValue | None:
-        """
-        Get the reset value for one parameter.
-
-        Args:
-            param_name: Name of the parameter to reset
-            param_type: Type of the parameter (int, str, bool, etc.)
-            obj_type: The specific dataclass type
-            is_global_config_editing: Whether global config is being edited (detected if None)
-
-        Returns:
-            - For global config editing: Actual default values
-            - For lazy config editing: None to show placeholder text
-        """
-        # Context-driven behavior: Use the editing context to determine reset behavior
-        # This follows the architectural principle that behavior is determined by context
-        # of usage rather than intrinsic properties of the dataclass.
-
-        # Context-driven behavior: Use explicit context when provided
-        # Auto-detect editing mode if not explicitly provided
-        if is_global_config_editing is None:
-            is_global_config_editing = not has_lazy_resolution(obj_type)
-
-        # Context-driven behavior: Reset behavior depends on editing context
-        if is_global_config_editing:
-            # Global config editing: Reset to actual default values
-            # Users expect to see concrete defaults when editing global configuration
-            return self._get_actual_dataclass_field_default(param_name, obj_type)
-        else:
-            # CRITICAL FIX: For lazy config editing, always return None
-            # This ensures reset shows inheritance chain values (like compiler resolution)
-            # instead of concrete values from thread-local context
-            return None
-
-    def _get_actual_dataclass_field_default(
-        self, param_name: str, obj_type: type
-    ) -> ParameterValue | None:
-        """
-        Get the actual default value for a parameter.
-
-        Works uniformly for dataclasses, functions, and any other object type.
-        Always returns None for non-existent fields (fail-soft for dynamic properties).
-
-        Returns:
-        - If class attribute is None → return None (show placeholder)
-        - If class attribute has concrete value → return that value
-        - If field(default_factory) → call default_factory and return result
-        - If field doesn't exist → return None (dynamic property)
-        """
-        import inspect
-        from dataclasses import MISSING, fields, is_dataclass
-
-        # For pure functions: get default from signature
-        if callable(obj_type) and not is_dataclass(obj_type) and not inspect.isclass(obj_type):
-            sig = inspect.signature(obj_type)
-            if param_name in sig.parameters:
-                default = sig.parameters[param_name].default
-                return None if default is inspect.Parameter.empty else default
-            return None  # Dynamic property, not in signature
-
-        # For all other types (dataclasses, ABCs, classes): check class attribute first
-        sentinel = object()
-        class_value = inspect.getattr_static(obj_type, param_name, sentinel)
-        if class_value is not sentinel:
-            return class_value
-
-        # For dataclasses: check if it's a field(default_factory=...) field
-        if is_dataclass(obj_type):
-            dataclass_fields = {f.name: f for f in fields(obj_type)}
-            if param_name not in dataclass_fields:
-                return None  # Dynamic property, not a dataclass field
-
-            field_info = dataclass_fields[param_name]
-
-            # Handle field(default_factory=...) case
-            if field_info.default_factory is not MISSING:
-                try:
-                    return field_info.default_factory()
-                except Exception as e:
-                    raise ValueError(
-                        f"Failed to call default_factory for field '{param_name}': {e}"
-                    ) from e
-
-            # Handle field with explicit default
-            if field_info.default is not MISSING:
-                return field_info.default
-
-            # Field has no default (should not happen in practice)
-            return None
-
-        # For non-dataclass types: return None (dynamic property)
-        return None
