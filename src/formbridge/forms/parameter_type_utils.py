@@ -5,10 +5,10 @@ This module provides centralized type checking and resolution methods to elimina
 code duplication between PyQt and Textual parameter form implementations.
 """
 
-import dataclasses
 from enum import Enum
 
 from objectstate.lazy_factory import LazyDataclass
+from objectstate.field_access import DataclassFieldAccess
 from python_introspect import (
     get_enum_from_list,
     optional_member_type,
@@ -79,7 +79,7 @@ class ParameterTypeUtils:
             False
         """
         optional_type = optional_member_type(param_type)
-        return optional_type is not None and dataclasses.is_dataclass(optional_type)
+        return DataclassFieldAccess.is_config_type(optional_type)
 
     @staticmethod
     def get_optional_inner_type(param_type: type) -> type:
@@ -157,7 +157,7 @@ class ParameterTypeUtils:
         Returns:
             True if the object has __dataclass_fields__ attribute
         """
-        return dataclasses.is_dataclass(obj)
+        return DataclassFieldAccess.is_config_type(obj if isinstance(obj, type) else type(obj))
 
     @staticmethod
     def has_resolve_field_value(obj: any) -> bool:

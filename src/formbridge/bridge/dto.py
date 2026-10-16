@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, ClassVar, TypeVar
 
 from metaclass_registry import AutoRegisterMeta
 from objectstate import DottedFieldPath
+from objectstate.field_value import FieldValue, Unset
 from python_introspect import (
     JsonObject,
     JsonValue,
@@ -1366,28 +1367,8 @@ class UiObjectStateValuePreview:
 class UiObjectStateFieldValuePreviewCarrier:
     """Shared raw/resolved value previews for ObjectState-aware UI DTOs."""
 
-    raw_value_is_none: bool = False
-    resolved_value_is_none: bool = False
-    raw_value_preview: UiObjectStateValuePreview | None = field(
-        default=None,
-        metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
-                includes=lambda owner, field_value: (
-                    field_value is not None or owner.raw_value_is_none
-                )
-            )
-        },
-    )
-    resolved_value_preview: UiObjectStateValuePreview | None = field(
-        default=None,
-        metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
-                includes=lambda owner, field_value: (
-                    field_value is not None or owner.resolved_value_is_none
-                )
-            )
-        },
-    )
+    raw_value_preview: UiObjectStateValuePreview | None = None
+    resolved_value_preview: UiObjectStateValuePreview | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -1398,8 +1379,8 @@ class UiObjectStateFieldSemanticCarrier(UiObjectStateFieldValuePreviewCarrier):
     signature_diff: bool = False
     last_changed: bool = False
     semantic_markers: tuple[str, ...] = ()
-    raw_value: JsonValue | None = None
-    resolved_value: JsonValue | None = None
+    raw_value: FieldValue = field(default_factory=Unset)
+    resolved_value: FieldValue = field(default_factory=Unset)
     inherited_value: bool = False
     provenance: UiObjectStateFieldProvenance | None = None
 
@@ -1506,35 +1487,15 @@ class UiWidgetActionSummary(UiWidgetActionSemanticCarrier, WidgetNodeIdentity):
     tool_tip: str
     item_texts: tuple[str, ...] = ()
     context_label: str | None = None
-    raw_value: JsonValue | None = field(
-        default=None,
-        metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
-                includes=lambda owner, field_value: (
-                    owner.raw_value_preview is None
-                    and (field_value is not None or owner.raw_value_is_none)
-                )
-            )
-        },
-    )
-    resolved_value: JsonValue | None = field(
-        default=None,
-        metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
-                includes=lambda owner, field_value: (
-                    owner.resolved_value_preview is None
-                    and (field_value is not None or owner.resolved_value_is_none)
-                )
-            )
-        },
-    )
-
     def compact_projection(self) -> JsonObject:
         """Return the field-declaration-owned compact action projection."""
 
+        # Serialize through declared field types before selecting compact keys;
+        # serializing detached values would erase their member-family tags.
+        payload = to_jsonable(self)
         return {
-            field_name: to_jsonable(field_value)
-            for field_name, field_value in compact_dataclass_projection(self).items()
+            field_name: payload[field_name]
+            for field_name in compact_dataclass_projection(self)
         }
 
 

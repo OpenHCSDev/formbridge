@@ -98,7 +98,7 @@ def test_update_form_from_instance_skips_fully_unchanged_document() -> None:
     assert nested_manager.updated == []
 
 
-def test_update_form_from_instance_preserves_explicit_reset_to_none() -> None:
+def test_update_form_from_instance_preserves_literal_null() -> None:
     root_manager = _RecordingFormManager(
         {
             "name": "override",

@@ -42,7 +42,8 @@ Architecture:
 import logging
 from abc import ABC, ABCMeta
 from collections.abc import Callable
-from dataclasses import dataclass, is_dataclass
+from dataclasses import dataclass
+from objectstate.field_access import DataclassFieldAccess
 
 from objectstate.lazy_factory import get_base_type_for_lazy
 from python_introspect import optional_member_type
@@ -66,7 +67,7 @@ class _InlineDataclassWidgetCatalog:
         dataclass_type: type,
         widget_factory: InlineDataclassWidgetFactory,
     ) -> None:
-        if not is_dataclass(dataclass_type):
+        if not DataclassFieldAccess.is_config_type(dataclass_type):
             raise TypeError(
                 "Inline dataclass widgets can only be registered for dataclass types; "
                 f"got {dataclass_type!r}."
@@ -192,7 +193,7 @@ class OptionalDataclassInfo(ParameterInfoBase, metaclass=ParameterInfoMeta):
         - T is a dataclass
         """
         inner_type = optional_member_type(param_type)
-        return inner_type is not None and is_dataclass(inner_type)
+        return DataclassFieldAccess.is_config_type(inner_type)
 
 
 @dataclass
@@ -212,7 +213,7 @@ class InlineDataclassWidgetInfo(ParameterInfoBase, metaclass=ParameterInfoMeta):
 
     @staticmethod
     def matches(param_type: type) -> bool:
-        return is_dataclass(param_type) and _InlineDataclassWidgetCatalog.has_factory_for(
+        return DataclassFieldAccess.is_config_type(param_type) and _InlineDataclassWidgetCatalog.has_factory_for(
             param_type
         )
 
@@ -255,7 +256,7 @@ class DirectDataclassInfo(ParameterInfoBase, metaclass=ParameterInfoMeta):
         - Type is a dataclass
         - Type is NOT Optional
         """
-        return is_dataclass(param_type)
+        return DataclassFieldAccess.is_config_type(param_type)
 
 
 @dataclass

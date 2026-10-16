@@ -11,6 +11,7 @@ from typing import ClassVar
 
 from objectstate import ObjectState, ObjectStateRegistry
 from objectstate.inspection import FieldInspection, type_name, type_qualname
+from objectstate.field_value import FieldValue, Unset
 from objectstate.field_access import DottedFieldPath, FieldAccessError
 from python_introspect import (
     JsonValue,
@@ -163,16 +164,8 @@ class ObjectStateFieldSemanticProjection(FieldInspection):
     """One inspected ObjectState field projected onto the bridge's DTOs."""
 
     @property
-    def raw_json_value(self) -> JsonValue:
-        return self.json_value(self.raw_value)
-
-    @property
-    def resolved_json_value(self) -> JsonValue | None:
-        return self.resolved.project(self.json_value)
-
-    @property
     def raw_value_preview(self) -> UiObjectStateValuePreview:
-        return self.value_preview(self.raw_value)
+        return self.raw.project(self.value_preview)
 
     @property
     def resolved_value_preview(self) -> UiObjectStateValuePreview | None:
@@ -201,15 +194,18 @@ class ObjectStateFieldSemanticProjection(FieldInspection):
             signature_diff=self.signature_diff,
             last_changed=self.last_changed,
             semantic_markers=self.semantic_markers,
-            raw_value=self.raw_json_value if include_values else None,
-            resolved_value=self.resolved_json_value if include_values else None,
+            raw_value=self._payload_member(self.raw, include_values),
+            resolved_value=self._payload_member(self.resolved, include_values),
             raw_value_preview=self.raw_value_preview,
             resolved_value_preview=self.resolved_value_preview,
-            raw_value_is_none=self.raw_value_is_none,
-            resolved_value_is_none=self.resolved_value_is_none,
             inherited_value=self.inherited_value,
             provenance=self.provenance_dto,
         )
+
+    def _payload_member(self, member: FieldValue, include_values: bool) -> FieldValue:
+        # An excluded datum is explicitly absent from this projection. Keep
+        # directives intact; never pretend omitted data is literal null.
+        return FieldValue.of(member.map(self.json_value if include_values else lambda value: Unset()))
 
     def to_field_summary(
         self,

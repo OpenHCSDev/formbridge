@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from python_introspect import JsonValue, project_dataclass
+from objectstate.field_value import FieldValue
 
 from formbridge.bridge.dto import (
     SemanticFields,
@@ -128,11 +129,15 @@ class ObjectStateFieldListProjector:
             resolved_value=cls.compact_value(query, field.resolved_value),
         )
 
+    @classmethod
+    def compact_value(cls, query: UiObjectStateFieldListQuery, member: FieldValue) -> FieldValue:
+        return FieldValue.of(member.map(lambda datum: cls._compact_datum(query, datum)))
+
     @staticmethod
-    def compact_value(
+    def _compact_datum(
         query: UiObjectStateFieldListQuery,
-        value: JsonValue | None,
-    ) -> JsonValue | None:
+        value: JsonValue,
+    ) -> JsonValue:
         if isinstance(value, str) and len(value) > query.max_value_chars:
             return {
                 "type": "str",
