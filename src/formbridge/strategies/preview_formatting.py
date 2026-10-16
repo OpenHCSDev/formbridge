@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from objectstate.ui_visibility import UIParameterVisibilityPolicy
+
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, TypeAlias
@@ -52,17 +54,17 @@ class FormattingConfig:
     max_value_length: int = 96
     """Maximum characters per value, with an ellipsis for longer values; zero shows all text."""
 
-    group_separator: str = field(default=" | ", metadata={"ui_hidden": True})
+    group_separator: str = field(default=" | ", metadata=UIParameterVisibilityPolicy.field_metadata(True))
     """Text before each labelled configuration group after the first group."""
 
-    field_separator: str = field(default=", ", metadata={"ui_hidden": True})
+    field_separator: str = field(default=", ", metadata=UIParameterVisibilityPolicy.field_metadata(True))
     """Text between successive field values within one configuration group."""
 
-    closing_brace_separator: str = field(default="", metadata={"ui_hidden": True})
+    closing_brace_separator: str = field(default="", metadata=UIParameterVisibilityPolicy.field_metadata(True))
     """Text before the closing brace of each labelled configuration group."""
 
     container_abbr_func: Callable[[type], str] = field(
-        default=get_group_abbreviation, metadata={"ui_hidden": True}
+        default=get_group_abbreviation, metadata=UIParameterVisibilityPolicy.field_metadata(True)
     )
     """Function mapping a configuration declaration type to its preview heading.
 

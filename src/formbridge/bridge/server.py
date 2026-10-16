@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from objectstate.ui_visibility import UIParameterVisibilityPolicy
+
 import json
 import os
 import pickle
@@ -73,12 +75,12 @@ class UiBridgeServerConfig(EndpointConnectionSpec):
     """Exact descriptor path; overrides ``descriptor_directory_path``."""
     bridge_instance_id: NonBlankString | None = field(
         default=None,
-        metadata={"ui_hidden": True},
+        metadata=UIParameterVisibilityPolicy.field_metadata(True),
     )
     """Stable bridge instance identifier; None generates a fresh ui-prefixed one at startup."""
     auth_token: NonBlankString | None = field(
         default=None,
-        metadata={"ui_hidden": True},
+        metadata=UIParameterVisibilityPolicy.field_metadata(True),
     )
     """Authentication token required by bridge clients. None generates a random token at startup."""
     poll_timeout_ms: PositiveInteger = 100

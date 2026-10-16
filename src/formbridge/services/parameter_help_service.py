@@ -7,12 +7,15 @@ import inspect
 import logging
 import re
 from collections.abc import Callable
-from dataclasses import dataclass, fields, is_dataclass
+from dataclasses import dataclass, fields
+from objectstate.declarations import ValueDeclaration
+from python_introspect import resolve_annotated
 from enum import Enum
 from types import UnionType
 from typing import Annotated, Union, get_args, get_origin
 
-from objectstate.lazy_factory import get_base_type_for_lazy, is_lazy_dataclass
+from objectstate.lazy_factory import is_lazy_dataclass
+from python_introspect import resolve_declared_type
 from python_introspect import (
     DocstringExtractor,
     DocstringInfo,
@@ -93,33 +96,22 @@ PARAMETER_DESCRIPTION_FORMATTER = ParameterDescriptionFormatter()
 
 def dataclass_type_for_target(target: Callable | type | None) -> type | None:
     """Return the dataclass type represented by a help target."""
-    if target is None:
-        return None
-    if inspect.isclass(target) and is_dataclass(target):
-        return target
-    target_type = type(target)
-    if is_dataclass(target_type):
-        return target_type
-    return None
+    owners = ValueDeclaration.of(target).configuration_owners()
+    return owners[0].declaring_type if owners else None
 
 
 def source_dataclass_type(dataclass_type: type) -> type:
     """Return the source-authored dataclass for generated lazy dataclass types."""
+    base_type = resolve_declared_type(dataclass_type)
     if is_lazy_dataclass(dataclass_type):
-        base_type = get_base_type_for_lazy(dataclass_type)
-        if base_type is None:
+        if base_type is dataclass_type:
             raise RuntimeError(
                 f"Lazy dataclass {dataclass_type.__qualname__} is missing its "
                 "registered source dataclass type."
             )
-        if not is_dataclass(base_type):
-            raise RuntimeError(
-                f"Lazy dataclass {dataclass_type.__qualname__} resolves to "
-                f"non-dataclass source type {base_type!r}."
-            )
         return base_type
 
-    return dataclass_type
+    return base_type
 
 
 def source_class_docstring_resolution(dataclass_type: type) -> DataclassDocstringResolution:
@@ -194,23 +186,10 @@ def split_docstring_summary(docstring: str | None, fallback: str) -> tuple[str, 
 
 def dataclass_type_from_annotation(annotation) -> type | None:
     """Return a dataclass type represented by a field annotation."""
-    if inspect.isclass(annotation) and is_dataclass(annotation):
-        return annotation
-
-    origin = get_origin(annotation)
-    if origin is Annotated:
-        annotated_args = get_args(annotation)
-        if not annotated_args:
-            return None
-        return dataclass_type_from_annotation(annotated_args[0])
-
-    if origin in (Union, UnionType):
-        dataclass_args = tuple(
-            arg for arg in get_args(annotation) if inspect.isclass(arg) and is_dataclass(arg)
-        )
-        if len(dataclass_args) == 1:
-            return dataclass_args[0]
-    return None
+    annotation = resolve_annotated(annotation)
+    arguments = get_args(annotation) if get_origin(annotation) in (Union, UnionType) else (annotation,)
+    owners = tuple(owner for argument in arguments for owner in ValueDeclaration.of(argument).configuration_owners())
+    return owners[0].declaring_type if len(owners) == 1 else None
 
 
 def dataclass_field_description(description: str | None, annotation) -> str | None:

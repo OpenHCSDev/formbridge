@@ -49,7 +49,6 @@ from formbridge.selection import (
     SelectionModeCarrier,
 )
 from formbridge.services.widget_tree_projection_config import (
-    COMPACT_FIELD_PROJECTION_METADATA_KEY,
     CompactFieldProjection,
     WidgetNodeIdentity,
     WidgetTreeProjectionControls,
@@ -1472,49 +1471,49 @@ class UiWidgetTreeNode(WidgetNodeIdentity):
 class UiWidgetActionSummary(UiWidgetActionSemanticCarrier, WidgetNodeIdentity):
     label: str | None = field(
         metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
+            CompactFieldProjection: CompactFieldProjection(
                 includes=always_project_compact_field
             )
         }
     )
     visible: bool = field(
         metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
+            CompactFieldProjection: CompactFieldProjection(
                 includes=always_project_compact_field
             )
         }
     )
     enabled: bool = field(
         metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
+            CompactFieldProjection: CompactFieldProjection(
                 includes=always_project_compact_field
             )
         }
     )
     geometry: UiWidgetRect = field(
         metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
+            CompactFieldProjection: CompactFieldProjection(
                 includes=always_project_compact_field
             )
         }
     )
     global_geometry: UiWidgetRect = field(
         metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
+            CompactFieldProjection: CompactFieldProjection(
                 includes=always_project_compact_field
             )
         }
     )
     action_kinds: tuple[str, ...] = field(
         metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
+            CompactFieldProjection: CompactFieldProjection(
                 includes=always_project_compact_field
             )
         }
     )
     clickable: bool = field(
         metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
+            CompactFieldProjection: CompactFieldProjection(
                 includes=always_project_compact_field
             )
         }
@@ -1522,7 +1521,7 @@ class UiWidgetActionSummary(UiWidgetActionSemanticCarrier, WidgetNodeIdentity):
     checkable: bool | None
     checked: bool | None = field(
         metadata={
-            COMPACT_FIELD_PROJECTION_METADATA_KEY: CompactFieldProjection(
+            CompactFieldProjection: CompactFieldProjection(
                 includes=lambda owner, field_value: (
                     isinstance(field_value, bool) and (field_value or owner.checkable is True)
                 )

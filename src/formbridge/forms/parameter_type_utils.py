@@ -55,31 +55,6 @@ class ParameterTypeUtils:
         """
         return optional_member_type(param_type) is not None
 
-    @staticmethod
-    def is_optional_dataclass(param_type: type) -> bool:
-        """
-        Check if parameter type is Optional[dataclass].
-
-        This method determines whether a type annotation represents an optional
-        dataclass parameter (Union[DataclassType, None]).
-
-        Args:
-            param_type: The type to check
-
-        Returns:
-            True if the type is Optional[dataclass], False otherwise
-
-        Example:
-            >>> from typing import Optional
-            >>> @dataclass
-            ... class Config: pass
-            >>> ParameterTypeUtils.is_optional_dataclass(Optional[Config])
-            True
-            >>> ParameterTypeUtils.is_optional_dataclass(Config)
-            False
-        """
-        optional_type = optional_member_type(param_type)
-        return DataclassFieldAccess.is_config_type(optional_type)
 
     @staticmethod
     def get_optional_inner_type(param_type: type) -> type:
@@ -146,74 +121,10 @@ class ParameterTypeUtils:
         """
         return get_enum_from_list(param_type)
 
-    @staticmethod
-    def has_dataclass_fields(obj: any) -> bool:
-        """
-        Check if an object has dataclass fields.
 
-        Args:
-            obj: The object to check
 
-        Returns:
-            True if the object has __dataclass_fields__ attribute
-        """
-        return DataclassFieldAccess.is_config_type(obj if isinstance(obj, type) else type(obj))
 
-    @staticmethod
-    def has_resolve_field_value(obj: any) -> bool:
-        """
-        Check if an object has the _resolve_field_value method (lazy dataclass).
 
-        Args:
-            obj: The object to check
-
-        Returns:
-            True if the object has _resolve_field_value attribute
-        """
-        return isinstance(obj, LazyDataclass)
-
-    @staticmethod
-    def is_concrete_dataclass(obj: any) -> bool:
-        """
-        Check if an object is a concrete (non-lazy) dataclass.
-
-        Args:
-            obj: The object to check
-
-        Returns:
-            True if the object is a concrete dataclass
-        """
-        return ParameterTypeUtils.has_dataclass_fields(
-            obj
-        ) and not ParameterTypeUtils.has_resolve_field_value(obj)
-
-    @staticmethod
-    def is_lazy_dataclass(obj: any) -> bool:
-        """
-        Check if an object is a lazy dataclass.
-
-        Args:
-            obj: The object to check
-
-        Returns:
-            True if the object is a lazy dataclass
-        """
-        return ParameterTypeUtils.has_resolve_field_value(obj)
-
-    @staticmethod
-    def extract_value_attribute(obj: any) -> any:
-        """
-        Extract the value attribute from an object if it exists.
-
-        This is commonly used for enum values and other wrapped types.
-
-        Args:
-            obj: The object to extract value from
-
-        Returns:
-            The value attribute if it exists, otherwise the original object
-        """
-        return obj.value if isinstance(obj, Enum) else obj
 
     @staticmethod
     def convert_string_to_bool(value: str) -> bool:
