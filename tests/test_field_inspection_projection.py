@@ -11,18 +11,16 @@ class Config:
     text: str | None = None
 
 
-@pytest.mark.parametrize('datum, expected_type', [(None, 'None'), (Unset(), 'Unset'), ('None', 'str'), ('Unset()', 'str'), ('', 'str')])
-def test_resolved_projection_distinguishes_null_absence_and_literal_text(datum, expected_type):
+@pytest.mark.parametrize('datum, text', [(None, 'None'), (Unset(), 'Unset()'), ('None', "'None'"), ('Unset()', "'Unset()'"), ('', "''")])
+def test_resolved_projection_distinguishes_null_absence_and_literal_text(datum, text):
     set_base_config_type(Config)
     state = ObjectState(Config(text=datum))
     projected = ObjectStateFieldSemanticProjection.of(state.fields.text)
     preview = projected.resolved_value_preview
-    assert preview.type_name == expected_type
-    assert preview.is_none == (datum is None)
     carrier = projected.to_semantic_carrier(include_values=True)
     assert carrier.raw_value == FieldValue.of(datum)
     assert carrier.resolved_value == FieldValue.of(datum)
-    assert preview.text == ('Unset()' if isinstance(datum, Unset) else repr(datum))
+    assert preview.text == text
 
 
 @pytest.mark.parametrize('member', [Value(None), Value(False), Value(0), Value(''), Value('None'), Inherit(), Unset()])
@@ -35,8 +33,8 @@ def test_semantic_carrier_roundtrip_preserves_members(member):
         UiObjectStateFieldSemanticCarrier, json.loads(json.dumps(to_jsonable(original)))
     )
     assert decoded == original
-    assert type(decoded.raw_value) is type(member)
-    assert type(decoded.resolved_value) is type(member)
+    assert decoded.raw_value == member
+    assert decoded.resolved_value == member
 
 
 def test_excluding_payload_does_not_turn_it_into_null_or_erase_an_inheritance_request():
@@ -70,8 +68,9 @@ def test_compact_action_retains_member_tags_and_decodes(member):
         raw_value=member, resolved_value=member,
     )
     wire = action.compact_projection()
-    assert wire['raw_value'] == ({'Value': {'value': member.value}} if isinstance(member, Value) else {type(member).__name__: {}})
     decoded = dataclass_from_mapping(UiWidgetActionSummary, wire)
+    assert decoded.raw_value == member
+    assert decoded.resolved_value == member
     assert decoded == action
 
 
@@ -85,3 +84,38 @@ def test_field_list_compacts_concrete_data_without_converting_directives_or_null
     assert ObjectStateFieldListProjector.compact_value(query, Value('abcdef')) == Value({
         'type': 'str', 'length': 6, 'truncated': True, 'preview': 'abc',
     })
+
+
+def test_missing_preview_and_a_preview_of_literal_null_are_distinct_members():
+    from python_introspect import dataclass_from_mapping, to_jsonable
+    from formbridge.bridge.dto import (
+        UiObjectStateFieldSemanticCarrier, UiObjectStateNoPreview,
+        UiObjectStateTextPreview,
+    )
+    absent = UiObjectStateFieldSemanticCarrier(raw_value=Value(None))
+    present = UiObjectStateFieldSemanticCarrier(
+        raw_value=Value(None), raw_value_preview=UiObjectStateTextPreview('None'),
+    )
+    assert absent.raw_value_preview == UiObjectStateNoPreview()
+    assert absent.raw_value_preview.render(Value(None), repr) == 'None'
+    assert present.raw_value_preview.render(Value('different'), repr) == 'None'
+    assert to_jsonable(absent)['raw_value_preview'] == {'UiObjectStateNoPreview': {}}
+    assert to_jsonable(present)['raw_value_preview'] == {
+        'UiObjectStateTextPreview': {'text': 'None', 'truncated': False},
+    }
+    for original in (absent, present):
+        assert dataclass_from_mapping(
+            UiObjectStateFieldSemanticCarrier, to_jsonable(original),
+        ) == original
+
+
+def test_declaring_symbol_owns_nested_import_resolution_and_roundtrip():
+    from python_introspect import dataclass_from_mapping, to_jsonable
+    from formbridge.bridge.dto import UiObjectStateFieldDeclaration
+    declaration = UiObjectStateFieldDeclaration.of(Config)
+    assert declaration.resolve() is Config
+    assert declaration.import_path == f'{Config.__module__}.{Config.__qualname__}'
+    assert declaration.display_name == 'Config'
+    assert dataclass_from_mapping(
+        UiObjectStateFieldDeclaration, to_jsonable(declaration),
+    ) == declaration

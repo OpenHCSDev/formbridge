@@ -5,12 +5,12 @@ from __future__ import annotations
 import hashlib
 import logging
 from collections.abc import Callable, Mapping, Sequence, Set
-from dataclasses import dataclass, is_dataclass
+from dataclasses import dataclass
 from enum import Enum
 from typing import ClassVar
 
 from objectstate import ObjectState, ObjectStateRegistry
-from objectstate.inspection import FieldInspection, type_name, type_qualname
+from objectstate.inspection import FieldInspection
 from objectstate.field_value import FieldValue, Unset
 from objectstate.field_access import DottedFieldPath, FieldAccessError
 from python_introspect import (
@@ -46,6 +46,8 @@ from formbridge.bridge.dto import (
     UiObjectStateFieldProvenance,
     UiObjectStateFieldSemanticCarrier,
     UiObjectStateFieldSummary,
+    UiObjectStateFieldDeclaration,
+    UiObjectStateTextPreview,
     UiObjectStateScopeCatalog,
     UiObjectStateScopeIdentity,
     UiObjectStateScopeListRequest,
@@ -168,7 +170,7 @@ class ObjectStateFieldSemanticProjection(FieldInspection):
         return self.raw.project(self.value_preview)
 
     @property
-    def resolved_value_preview(self) -> UiObjectStateValuePreview | None:
+    def resolved_value_preview(self) -> UiObjectStateValuePreview:
         return self.resolved.project(self.value_preview)
 
     def semantic_address(self, *, window_id: str | None = None) -> UiSemanticAddress:
@@ -227,9 +229,7 @@ class ObjectStateFieldSemanticProjection(FieldInspection):
             ),
             field_name=self.field_name,
             container_path=self.container_path,
-            object_state_path_type=self.declaring_type,
-            raw_value_type=self.raw_value_type,
-            resolved_value_type=self.resolved_value_type,
+            declared_by=UiObjectStateFieldDeclaration.of(self.field.declaring_type),
             parameter_description=parameter_description,
         )
 
@@ -239,7 +239,6 @@ class ObjectStateFieldSemanticProjection(FieldInspection):
             return None
         return UiObjectStateFieldProvenance(
             source_scope_id=agent_object_state_scope_id(self.provenance.source_scope_id),
-            source_type=type_qualname(self.provenance.source_type),
             source_field_path=self.provenance.source_field_path,
         )
 
@@ -256,9 +255,7 @@ class ObjectStateFieldSemanticProjection(FieldInspection):
     @classmethod
     def value_preview(cls, value) -> UiObjectStateValuePreview:
         text, truncated = cls.preview_text(value)
-        return UiObjectStateValuePreview(
-            type_name=type_name(value),
-            is_none=value is None,
+        return UiObjectStateTextPreview(
             text=text,
             truncated=truncated,
         )
@@ -292,8 +289,6 @@ class ObjectStateFieldSemanticProjection(FieldInspection):
         ):
             items = tuple(cls._preview_item_text(item) for item in cls._first_items(value))
             return f"{type(value).__name__}(len={len(value)}, items={items!r})"
-        if is_dataclass(value) and not isinstance(value, type):
-            return repr(value)
         return repr(value)
 
     @staticmethod
@@ -360,7 +355,6 @@ class ObjectStateScopeProjectionService:
             identity=UiObjectStateScopeIdentity(
                 object_state_scope_id=agent_object_state_scope_id(state.scope_id) or state.scope_id,
             ),
-            object_type=type(state.object_instance).__name__,
             parameter_count=len(state.fields),
             dirty_field_count=len(state.dirty_fields),
             signature_diff_field_count=len(state.signature_diff_fields),

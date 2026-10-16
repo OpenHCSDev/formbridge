@@ -78,7 +78,6 @@ class ObjectStateFieldListProjector:
                 matched_scopes.append(
                     UiObjectStateFieldScopeProjection(
                         scope_id=scope_id,
-                        object_type=scope.object_type,
                         dirty_field_count=scope.dirty_field_count,
                         signature_diff_field_count=scope.signature_diff_field_count,
                         has_unsaved_changes=scope.has_unsaved_changes,
