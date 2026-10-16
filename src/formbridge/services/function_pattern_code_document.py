@@ -13,13 +13,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, ClassVar, get_type_hints
 
-from objectstate import (
-    ObjectState,
-    ObjectStateRegistry,
-    ScopeKey,
-    patch_lazy_constructors,
-    semantic_values_equal,
-)
+from objectstate import ObjectState, ObjectStateRegistry, ScopeKey, semantic_values_equal
 from python_introspect import (
     callable_declaration_kwargs,
     parameter_exclusions,
@@ -336,8 +330,7 @@ class FunctionPatternCodeDocumentService:
             )
 
         namespace = {}
-        with patch_lazy_constructors():
-            exec(source, namespace)
+        exec(source, namespace)
 
         if self.pattern_assignment_name not in namespace:
             raise FunctionPatternRoundTripError(
