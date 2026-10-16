@@ -11,9 +11,9 @@ from typing import ClassVar
 
 from objectstate import ObjectState, ObjectStateRegistry
 from objectstate.inspection import FieldInspection, type_name, type_qualname
+from objectstate.field_access import DottedFieldPath, FieldAccessError
 from python_introspect import (
     JsonValue,
-    UnifiedParameterAnalyzer,
     project_dataclass,
     to_jsonable,
 )
@@ -191,7 +191,7 @@ class ObjectStateFieldSemanticProjection(FieldInspection):
 
     @property
     def agent_scope_id(self) -> str:
-        return agent_object_state_scope_id(self.state.scope_id) or self.state.scope_id
+        return agent_object_state_scope_id(self.field.state.scope_id) or self.field.state.scope_id
 
     def to_semantic_carrier(
         self,
@@ -223,14 +223,14 @@ class ObjectStateFieldSemanticProjection(FieldInspection):
     ) -> UiObjectStateFieldSummary:
         parameter_description = None
         if include_description:
-            parameter_description = self.state.parameter_descriptions.get(self.field_path)
+            parameter_description = self.field.description
         return project_dataclass(
             UiObjectStateFieldSummary,
             self.to_semantic_carrier(include_values=include_values),
             schema_version=SCHEMA_VERSION,
             address=self.semantic_address(
                 window_id=UiStableWindowIdentityDeclaration.window_id_for_manager_scope(
-                    self.state.scope_id
+                    self.field.state.scope_id
                 ),
             ),
             field_name=self.field_name,
@@ -369,7 +369,7 @@ class ObjectStateScopeProjectionService:
                 object_state_scope_id=agent_object_state_scope_id(state.scope_id) or state.scope_id,
             ),
             object_type=type(state.object_instance).__name__,
-            parameter_count=len(state.parameters),
+            parameter_count=len(state.fields),
             dirty_field_count=len(state.dirty_fields),
             signature_diff_field_count=len(state.signature_diff_fields),
             has_unsaved_changes=bool(state.dirty_fields),
@@ -387,20 +387,17 @@ class ObjectStateScopeProjectionService:
         if not request.include_fields:
             return (), None
 
+        available = tuple(state.fields)
         if request.field_paths:
-            all_field_paths = tuple(
-                field_path for field_path in request.field_paths if field_path in state.parameters
-            )
+            all_field_paths = tuple(item for item in available if item.address.value in request.field_paths)
         else:
-            all_field_paths = tuple(sorted(state.parameters.keys()))
+            all_field_paths = tuple(sorted(available, key=lambda item: item.address.value))
         if request.field_filter is not AllFields:
             all_field_paths = tuple(
                 field_path
                 for field_path in all_field_paths
                 if request.field_filter.matches(
-                    self._field_summary(
-                        state,
-                        field_path,
+                    ObjectStateFieldSemanticProjection.of(field_path).to_field_summary(
                         include_values=False,
                         include_description=False,
                     ),
@@ -423,9 +420,7 @@ class ObjectStateScopeProjectionService:
             next_offset=next_page_offset,
         )
         fields = tuple(
-            self._field_summary(
-                state,
-                field_path,
+            ObjectStateFieldSemanticProjection.of(field_path).to_field_summary(
                 include_values=request.include_field_values,
                 include_description=request.include_field_descriptions,
             )
@@ -433,21 +428,7 @@ class ObjectStateScopeProjectionService:
         )
         return fields, page
 
-    def _field_summary(
-        self,
-        state: ObjectState,
-        field_path: str,
-        *,
-        include_values: bool,
-        include_description: bool,
-    ) -> UiObjectStateFieldSummary:
-        return ObjectStateFieldSemanticProjection.of(
-            state,
-            field_path,
-        ).to_field_summary(
-            include_values=include_values,
-            include_description=include_description,
-        )
+
 
 
 def object_state_for_agent_scope_id(scope_id: str) -> ObjectState | None:
@@ -486,7 +467,9 @@ class ObjectStateFieldMutationService:
                     ),
                 ),
             )
-        if request.field_path not in state.parameters:
+        try:
+            field = DottedFieldPath(request.field_path).bind(state)
+        except FieldAccessError:
             return self._error_result(
                 request,
                 AgentError(
@@ -497,18 +480,15 @@ class ObjectStateFieldMutationService:
                 ),
             )
 
-        before = self._field_summary(state, request)
+        before = ObjectStateFieldSemanticProjection.of(field).to_field_summary(include_values=request.include_field_values)
         try:
             if self._before_mutation is not None:
                 self._before_mutation(request.object_state_scope_id)
             if request.reset:
-                state.reset_parameter(request.field_path)
+                field.reset()
             else:
-                state.update_parameter(
-                    request.field_path,
-                    self._converted_value(state, request),
-                )
-            after = self._field_summary(state, request)
+                field.write(self._converted_value(field, request.value))
+            after = ObjectStateFieldSemanticProjection.of(field).to_field_summary(include_values=request.include_field_values)
             return UiObjectStateFieldMutationResult(
                 schema_version=SCHEMA_VERSION,
                 address=after.address,
@@ -525,32 +505,14 @@ class ObjectStateFieldMutationService:
                 before=before,
             )
 
-    @staticmethod
-    def _field_summary(
-        state: ObjectState,
-        request: UiObjectStateFieldMutationRequest,
-    ) -> UiObjectStateFieldSummary:
-        return ObjectStateFieldSemanticProjection.of(
-            state,
-            request.field_path,
-        ).to_field_summary(include_values=request.include_field_values)
+
 
     @staticmethod
-    def _converted_value(
-        state: ObjectState,
-        request: UiObjectStateFieldMutationRequest,
-    ) -> object:
-        help_target = state.type_for_path(request.field_path)
-        parameter_name = request.field_path.rsplit(".", 1)[-1]
-        parameter_info = UnifiedParameterAnalyzer.analyze(help_target).get(parameter_name)
-        if parameter_info is None:
-            return request.value
+    def _converted_value(field, value):
         return ParameterFormService().convert_value_to_type(
-            request.value,
-            parameter_info.param_type,
-            parameter_name,
-            help_target,
+            value, field.annotation, field.name, field.declaring_type,
         )
+
 
     @staticmethod
     def _error_result(
