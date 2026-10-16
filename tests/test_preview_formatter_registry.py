@@ -1,6 +1,6 @@
 """Preview formatter registration behavior."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pytest
 from objectstate.lazy_factory import LazyDataclassFactory
@@ -92,3 +92,65 @@ def test_group_heading_default_reads_the_objectstate_declaration() -> None:
     assert heading(HeadedConfig) == "cfg"
     assert heading(SpecializedHeadedConfig) == "cfg"
     assert heading(lazy_type) == "cfg"
+
+
+def test_field_consumers_group_name_and_convert_root_and_nested_addresses(monkeypatch) -> None:
+    from objectstate import ObjectState, config
+    from python_introspect import UnifiedParameterAnalyzer
+
+    from formbridge.bridge.dto import UiObjectStateFieldMutationRequest
+    from formbridge.bridge.object_state import ObjectStateFieldMutationService
+    from formbridge.utils.preview_formatters import PreviewFieldFormatRequest
+
+    from formbridge.strategies.preview_formatting import (
+        FormattingConfig,
+        ObjectStatePreviewFormattingService,
+    )
+
+    @dataclass
+    class PreviewChild:
+        value: int = 2
+
+    @dataclass
+    class PreviewRoot:
+        value: int = 1
+        child: PreviewChild = field(default_factory=PreviewChild)
+
+    monkeypatch.setattr(config, "_base_config_type", PreviewRoot)
+    state = ObjectState(PreviewRoot())
+    service = ObjectStatePreviewFormattingService(
+        FormattingConfig(container_abbr_func=lambda _owner: "child")
+    )
+
+    segments = service.collect_and_render(
+        state, ("value", "child.value"), {}, lambda request: str(request.value)
+    )
+
+    assert segments == [
+        ("root", None, ""), ("{", None, ""), ("1", "value", ""), ("}", None, ""),
+        ("child", "child", " | "), ("{", None, ""),
+        ("2", "child.value", ""), ("}", None, ""),
+    ]
+    def reject_reanalysis(*_args, **_kwargs):
+        raise AssertionError("Conversion must use ObjectState's admitted declarations")
+
+    monkeypatch.setattr(UnifiedParameterAnalyzer, "analyze", reject_reanalysis)
+    for address in ("value", "child.value"):
+        preview = PreviewFieldFormatRequest(
+            field_path=address, value=7, field_owner=state.type_for_path(address)
+        )
+        assert preview.field_name == "value"
+        mutation = UiObjectStateFieldMutationRequest.from_fields(
+            object_state_scope_id="scope", field_path=address, value="7"
+        )
+        assert ObjectStateFieldMutationService._converted_value(state, mutation) == 7
+
+    group_mutation = UiObjectStateFieldMutationRequest.from_fields(
+        object_state_scope_id="scope", field_path="child", value={"value": 7}
+    )
+    assert ObjectStateFieldMutationService._converted_value(state, group_mutation) == PreviewChild(7)
+    unknown = UiObjectStateFieldMutationRequest.from_fields(
+        object_state_scope_id="scope", field_path="unknown", value="untyped"
+    )
+    with pytest.raises(KeyError, match="unknown"):
+        ObjectStateFieldMutationService._converted_value(state, unknown)

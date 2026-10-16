@@ -224,7 +224,7 @@ class ObjectStatePreviewFormattingService:
             if not label:
                 continue
 
-            container_path = self._container_path(field_path)
+            container_path = DottedFieldPath(field_path).parent
             builder.add_field(
                 field_path,
                 label,
@@ -244,9 +244,3 @@ class ObjectStatePreviewFormattingService:
                 f"Preview field {field_path!r} requires a nominal type or callable declaration"
             )
         return declaration
-
-    @staticmethod
-    def _container_path(field_path: str) -> DottedFieldPath:
-        if "." not in field_path:
-            return DottedFieldPath("")
-        return DottedFieldPath(field_path.rsplit(".", 1)[0])

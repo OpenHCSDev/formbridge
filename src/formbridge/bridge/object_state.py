@@ -13,7 +13,6 @@ from objectstate import ObjectState, ObjectStateRegistry
 from objectstate.inspection import FieldInspection, type_name, type_qualname
 from python_introspect import (
     JsonValue,
-    UnifiedParameterAnalyzer,
     project_dataclass,
     to_jsonable,
 )
@@ -540,16 +539,11 @@ class ObjectStateFieldMutationService:
         state: ObjectState,
         request: UiObjectStateFieldMutationRequest,
     ) -> object:
-        help_target = state.type_for_path(request.field_path)
-        parameter_name = request.field_path.rsplit(".", 1)[-1]
-        parameter_info = UnifiedParameterAnalyzer.analyze(help_target).get(parameter_name)
-        if parameter_info is None:
-            return request.value
+        declaration = state.parameter_structure.declarations[request.field_path]
         return ParameterFormService().convert_value_to_type(
             request.value,
-            parameter_info.param_type,
-            parameter_name,
-            help_target,
+            declaration.param_type,
+            declaration.name,
         )
 
     @staticmethod

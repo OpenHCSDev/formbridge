@@ -13,6 +13,7 @@ from collections.abc import (
     Callable as CallableABC,
 )
 from collections.abc import (
+    Iterator,
     Mapping as MappingABC,
 )
 from collections.abc import (
@@ -23,13 +24,16 @@ from typing import Any, get_args, get_origin, get_type_hints
 
 from objectstate import (
     DataclassFieldAccess,
+    DottedFieldPath,
     LazyDefaultPlaceholderService,
+    ObjectState,
     UIParameterVisibilityRequest,
     has_lazy_resolution,
     should_hide_ui_parameter,
 )
 from python_introspect import (
     AnnotationChoices,
+    UnifiedParameterAnalyzer,
     coerce_enum_member,
     declared_annotation_choices,
     is_union_type,
@@ -37,7 +41,7 @@ from python_introspect import (
 )
 
 from formbridge.forms.parameter_form_constants import CONSTANTS
-from formbridge.forms.parameter_info_types import ParameterInfo, create_parameter_info
+from formbridge.forms.parameter_info_types import OptionalDataclassInfo, ParameterInfo
 from formbridge.forms.parameter_type_utils import ParameterTypeUtils
 from formbridge.forms.parameter_value_contracts import (
     FormObject,
@@ -92,7 +96,9 @@ class FormStructure:
     field_id: str
     parameters: list[ParameterInfo]
     nested_forms: dict[str, "FormStructure"]
-    has_optional_dataclasses: bool = False
+    @property
+    def has_optional_dataclasses(self) -> bool:
+        return any(isinstance(info, OptionalDataclassInfo) for info in self.parameters)
 
     def get_parameter_info(self, param_name: str) -> ParameterInfo | None:
         """
@@ -129,6 +135,30 @@ class ParameterFormService:
         """
         self._type_utils = ParameterTypeUtils()
 
+    def parameters_for_state(
+        self, state: ObjectState, parent_path: str = ""
+    ) -> Iterator[tuple[DottedFieldPath, ParameterInfo]]:
+        """Present admitted paths and their kinds without extracting a second form tree.
+
+        ObjectState owns the declarations, order and current values. This
+        service owns UI visibility and field-kind selection, for every frontend.
+        The yielded information is consumed immediately, not retained as state.
+        """
+        parent_type = state.type_for_path(parent_path)
+        for path in state.direct_parameter_paths(parent_path):
+            declaration = state.parameter_structure.declarations[path.value]
+            name = declaration.name
+            if self._should_hide_from_ui(parent_type, name, declaration.param_type):
+                continue
+            yield path, ParameterInfo.create(
+                name=name,
+                param_type=declaration.param_type,
+                current_value=state.get_resolved_value(path.value),
+                default_value=declaration.default_value,
+                description=declaration.description,
+                is_required=declaration.is_required,
+            )
+
     def analyze_parameters(self, input: ParameterAnalysisInput) -> FormStructure:
         """
         Analyze parameters and create form structure.
@@ -158,7 +188,6 @@ class ParameterFormService:
 
         param_infos = []
         nested_forms = {}
-        has_optional_dataclasses = False
 
         for param_name, parameter_type in input.param_type.items():
             current_value = input.default_value.get(param_name)
@@ -182,45 +211,23 @@ class ParameterFormService:
             )
             param_infos.append(param_info)
 
-            # Check for nested dataclasses using isinstance (type-safe!)
-            from formbridge.forms.parameter_info_types import (
-                DirectDataclassInfo,
-                OptionalDataclassInfo,
-            )
-
-            if isinstance(param_info, (OptionalDataclassInfo, DirectDataclassInfo)):
-                # Get actual field path from FieldPathDetector (no artificial "nested_" prefix)
-                # Unwrap Optional types to get the actual dataclass type for field path detection
-                unwrapped_param_type = self._unwrap_optional_dataclass_type(parameter_type)
-
-                # For function parameters (no parent dataclass), use parameter name directly
-                if input.parent_obj_type is None:
-                    nested_field_id = param_name
-                else:
-                    nested_field_id = self.resolve_declared_field_path(
-                        input.parent_obj_type,
-                        param_name,
-                        unwrapped_param_type,
-                    )
-
-                nested_structure = self._analyze_nested_dataclass(
-                    param_name,
-                    parameter_type,
-                    current_value,
-                    nested_field_id,
-                    input.parent_obj_type,
-                )
+            nested_structure = param_info.nested_form(self, input)
+            if nested_structure is not None:
                 nested_forms[param_name] = nested_structure
-
-            # Check for optional dataclasses using isinstance (type-safe!)
-            if isinstance(param_info, OptionalDataclassInfo):
-                has_optional_dataclasses = True
 
         return FormStructure(
             field_id=input.field_id,
             parameters=param_infos,
             nested_forms=nested_forms,
-            has_optional_dataclasses=has_optional_dataclasses,
+        )
+
+    def analyze_nested_parameter(self, info: ParameterInfo, analysis: ParameterAnalysisInput) -> FormStructure:
+        """Build the nested presentation requested by the admitted kind."""
+        unwrapped_type = self._unwrap_optional_dataclass_type(info.type)
+        nested_field_id = (info.name if analysis.parent_obj_type is None else
+                           self.resolve_declared_field_path(analysis.parent_obj_type, info.name, unwrapped_type))
+        return self._analyze_nested_dataclass(
+            info.name, info.type, info.current_value, nested_field_id, analysis.parent_obj_type,
         )
 
     def _should_hide_from_ui(
@@ -253,7 +260,8 @@ class ParameterFormService:
         )
 
     def _unwrap_optional_dataclass_type(self, param_type: type) -> type:
-        """Return the dataclass type behind Optional[T], or the type itself."""
+        """Return the structural type, retaining metadata on the declaration."""
+        param_type = resolve_annotated(param_type)
         if self._type_utils.is_optional_dataclass(param_type):
             return self._type_utils.get_optional_inner_type(param_type)
         return param_type
@@ -276,7 +284,7 @@ class ParameterFormService:
         return field_obj.metadata.get("ui_hidden", False)
 
     def convert_value_to_type(
-        self, value: ParameterValue, param_type: type, param_name: str, obj_type: type = None
+        self, value: ParameterValue, param_type: type, param_name: str
     ) -> ParameterValue | None:
         """
         Convert a value to the appropriate type for a parameter.
@@ -288,7 +296,6 @@ class ParameterFormService:
             value: The value to convert
             param_type: The target parameter type
             param_name: The parameter name (for debugging)
-            obj_type: The dataclass type (for sibling inheritance checks)
 
         Returns:
             The converted value
@@ -707,26 +714,14 @@ class ParameterFormService:
         parameters = ParameterDefaultsByName()
         parameter_types = ParameterTypesByName()
 
-        for field in dataclasses.fields(obj_type):
-            # Always extract actual field values when dataclass instance exists
-            # This preserves concrete user-entered values in nested lazy dataclass forms
-            if dataclass_instance is not None:
-                current_value = self._get_field_value(dataclass_instance, field)
-            else:
-                current_value = None  # Only use None when no instance exists
-
-            parameters[field.name] = current_value
-            parameter_types[field.name] = field.type
+        for name, declaration in UnifiedParameterAnalyzer.analyze(obj_type).items():
+            parameters[name] = (
+                DataclassFieldAccess.raw_value(dataclass_instance, name)
+                if dataclass_instance is not None else None
+            )
+            parameter_types[name] = declaration.param_type
 
         return parameters, parameter_types
-
-    def _get_field_value(
-        self, dataclass_instance: FormObject | None, field: dataclasses.Field
-    ) -> ParameterValue:
-        """Extract a single field value from a dataclass instance."""
-        if dataclass_instance is None:
-            return field.default
-        return DataclassFieldAccess.raw_value(dataclass_instance, field.name)
 
     def _create_parameter_info(
         self,
@@ -740,7 +735,7 @@ class ParameterFormService:
         Create parameter information object using discriminated union factory.
 
         Uses type introspection to automatically select the correct ParameterInfo
-        subclass (OptionalDataclassInfo, DirectDataclassInfo, or GenericInfo).
+        most specific admitted ParameterInfo subclass.
         """
         description = None
         resolved_info = parameter_info() if callable(parameter_info) else parameter_info
@@ -749,15 +744,12 @@ class ParameterFormService:
 
         # Use factory to create correct ParameterInfo subclass
         # Factory uses type introspection to determine which type to create
-        return create_parameter_info(
+        return ParameterInfo.create(
             name=param_name,
             param_type=param_type,
             current_value=current_value,
             description=description,
         )
-
-    # Class-level cache for nested dataclass parameter info (descriptions only)
-    _nested_param_info_cache = {}
 
     def _analyze_nested_dataclass(
         self,
@@ -768,31 +760,15 @@ class ParameterFormService:
         parent_obj_type: type = None,
     ) -> FormStructure:
         """Analyze a nested dataclass parameter."""
-        # Get the actual dataclass type
-        if self._type_utils.is_optional_dataclass(param_type):
-            obj_type = self._type_utils.get_optional_inner_type(param_type)
-        else:
-            obj_type = param_type
+        obj_type = self._unwrap_optional_dataclass_type(param_type)
 
         # Extract nested parameters using parent context
         nested_params, nested_types = self.extract_nested_parameters(
             current_value, obj_type, parent_obj_type
         )
 
-        # OPTIMIZATION: Cache parameter info (descriptions) by dataclass type
-        # We only need descriptions, not instance values, so analyze the type once and reuse
-        cache_key = obj_type
-        if cache_key in self._nested_param_info_cache:
-            nested_param_info = self._nested_param_info_cache[cache_key]
-        else:
-            # Recursively analyze nested structure with proper descriptions for nested fields
-            # Use existing infrastructure to extract field descriptions for the nested dataclass
-            from python_introspect import UnifiedParameterAnalyzer
-
-            # OPTIMIZATION: Always analyze the TYPE, not the instance
-            # This allows caching and avoids extracting field values we don't need
-            nested_param_info = UnifiedParameterAnalyzer.analyze(obj_type)
-            self._nested_param_info_cache[cache_key] = nested_param_info
+        # SignatureAnalyzer owns declaration caching and lazy help materialization.
+        nested_param_info = UnifiedParameterAnalyzer.analyze(obj_type)
 
         # Create type-safe input for recursive analysis
         # CRITICAL FIX: Use dotted paths for descriptions to match state._parameter_descriptions

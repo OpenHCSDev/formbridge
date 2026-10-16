@@ -7,7 +7,7 @@ from functools import singledispatch
 from types import FunctionType, MethodType
 from typing import cast
 
-from objectstate import ParameterOwner
+from objectstate import DottedFieldPath, ParameterOwner
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,4 +146,4 @@ class PreviewFieldFormatRequest:
     @property
     def field_name(self) -> str:
         """Return the leaf field name declared by ``field_owner``."""
-        return self.field_path.rsplit(".", 1)[-1]
+        return DottedFieldPath(self.field_path).field_name
