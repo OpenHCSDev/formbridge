@@ -303,7 +303,7 @@ class RawResolvedFields(UiObjectStateFieldFilter):
 
     @classmethod
     def matches(cls, field: UiObjectStateFieldSummary) -> bool:
-        return field.raw_value_is_none != field.resolved_value_is_none
+        return field.inherited_value
 
 
 class SemanticFields(UiObjectStateFieldFilter):

@@ -7,6 +7,7 @@ shared business logic and data management.
 
 Uses React-style discriminated unions for type-safe parameter handling.
 """
+from objectstate.field_value import FieldValue, Unset
 
 import dataclasses
 from collections.abc import (
@@ -277,6 +278,14 @@ class ParameterFormService:
 
     def convert_value_to_type(
         self, value: ParameterValue, param_type: type, param_name: str, obj_type: type = None
+    ) -> ParameterValue:
+        """Convert domain input through its annotation; retain field directives."""
+        return FieldValue.of(value).map(
+            lambda raw: self._convert_domain_value(raw, param_type, param_name, obj_type)
+        )
+
+    def _convert_domain_value(
+        self, value: ParameterValue, param_type: type, param_name: str, obj_type: type = None
     ) -> ParameterValue | None:
         """
         Convert a value to the appropriate type for a parameter.
@@ -300,10 +309,6 @@ class ParameterFormService:
         )
 
         if value is None:
-            return None
-
-        # Handle string "None" literal
-        if isinstance(value, str) and value == CONSTANTS.NONE_STRING_LITERAL:
             return None
 
         choices = declared_annotation_choices(param_type)
@@ -337,7 +342,7 @@ class ParameterFormService:
             return self._type_utils.convert_string_to_bool(value)
         if resolved_type in (int, float) and isinstance(value, str):
             if value == CONSTANTS.EMPTY_STRING:
-                return None
+                return Unset()
             try:
                 return resolved_type(value)
             except (ValueError, TypeError) as exc:
@@ -345,15 +350,6 @@ class ParameterFormService:
                     f"Invalid {resolved_type.__name__} value for parameter "
                     f"{param_name!r}: {value!r}"
                 ) from exc
-
-        # Handle empty strings in lazy context - convert to None for all parameter types
-        # This is critical for lazy dataclass behavior where None triggers placeholder resolution
-        if isinstance(value, str) and value == CONSTANTS.EMPTY_STRING:
-            return None
-
-        # Handle string types - also convert empty strings to None for consistency
-        if resolved_type is str and isinstance(value, str) and value == CONSTANTS.EMPTY_STRING:
-            return None
 
         return value
 
