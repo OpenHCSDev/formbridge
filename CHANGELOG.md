@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0
+
+Requires `objectstate>=5.0.0,<6` (#13).
+
+Parameter kinds select themselves through inheritance: `ParameterInfo.create`
+picks the most specific declared kind (`DirectDataclassInfo`, `OptionalInfo`,
+`OptionalDataclassInfo`, `InlineDataclassWidgetInfo`), and each kind supplies
+its own `nested_form`. Bridge conversion reads the admitted declaration from
+`state.parameter_structure.declarations` and takes three arguments.
+
+Removed: `ParameterInfoBase`, `GenericInfo` (use `ParameterInfo`),
+`create_parameter_info` (use `ParameterInfo.create`), `EnumDispatchService`,
+`ParameterServiceABC`, and the converter's fourth `obj_type` argument.
+
 ## 0.1.5
 
 Requires `python-introspect>=0.3.0,<0.4` (was `<0.3`), `objectstate>=4.0.1,<5`
