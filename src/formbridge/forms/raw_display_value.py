@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 
 from objectstate import DataclassFieldAccess
 from objectstate.lazy_factory import replace_raw
-from objectstate.field_value import FieldValue
+from objectstate.declarations import ValueDeclaration
 from python_introspect import resolve_declared_type
 
 
@@ -66,19 +66,15 @@ class RawDisplayValue:
     def shows_inherited(self, field_name: str) -> bool:
         """Whether the shown field was inherited rather than declared here."""
 
-        return (
-            FieldValue.is_inherited(self.raw_field(field_name))
-            and not FieldValue.is_inherited(self.display_field(field_name))
+        declaration = ValueDeclaration.of(self.declared_type)
+        return declaration.read_raw(self.raw, field_name).inherited_from(
+            declaration.read_raw(self.display, field_name)
         )
 
     def field_default(self, field_name: str) -> object:
         """The declared default of one field of the concrete dataclass."""
 
-        return next(
-            item.default
-            for item in fields(self.declared_type)
-            if item.name == field_name
-        )
+        return ValueDeclaration.of(self.declared_type).own_default(field_name).stored
 
     def replacing(self, **changes: object) -> RawDisplayValue:
         """The value after an edit: the fields change in both ``raw`` and ``display``."""
