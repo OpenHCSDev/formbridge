@@ -24,6 +24,7 @@ classifiers = [
 keywords = ["forms", "reactive", "dataclass", "ui-bridge", "headless"]
 
 dependencies = [
+    "annotated-types>=0.7.0",
     "docutils>=0.20",
     "metaclass-registry>=0.4.0",
     "objectstate>=5.0.0,<6",
