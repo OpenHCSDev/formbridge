@@ -11,6 +11,11 @@ UI it talks to.
 
 - **Forms** (`formbridge.forms`): the parameter model behind generated forms:
   parameter info, type analysis, value contracts and the form service.
+  `formbridge.forms.declared_fields` is what every backend reads a field
+  through: `DeclaredField` (label, help, default, bounds, search text,
+  validation and edit), `FieldPath`, the `Multiline` and `Placeholder` kinds,
+  `FormPage` (which tab a top-level group is shown on) and `DeclaredViews`,
+  the registry a backend's widget family uses to pick a widget per kind.
 - **Services** (`formbridge.services`): help documents and parameter help,
   function-pattern code documents, scope tokens, the pattern data manager,
   path cache, log discovery and streaming, system metrics, ZMQ server scanning,
