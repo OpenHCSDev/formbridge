@@ -5,6 +5,7 @@ Simple formatting and debug utilities used across the forms layer.
 """
 
 import logging
+import re
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -21,7 +22,13 @@ class FieldDisplayText:
 
     @classmethod
     def from_field_name(cls, name: str) -> "FieldDisplayText":
-        display_name = name.replace("_", " ").title()
+        # Labels accept both parameter_names and nominal ClassNames.
+        words = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", name)
+        words = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", words)
+        display_name = " ".join(
+            word if word.isupper() else word.title()
+            for word in words.replace("_", " ").split(" ")
+        )
         return cls(
             display_name=display_name,
             field_label=f"{display_name}:",

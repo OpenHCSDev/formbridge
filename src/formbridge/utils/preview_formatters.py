@@ -9,6 +9,8 @@ from typing import cast
 
 from objectstate import ParameterOwner
 
+from formbridge.forms.ui_utils import FieldDisplayText
+
 
 @dataclass(frozen=True, slots=True)
 class PreviewLabelResolution:
@@ -95,7 +97,7 @@ def format_preview_value(
     value: object, detail: PreviewValueDetail = PreviewValueDetail.COMPACT
 ) -> str | None:
     """Project display values by nominal type, without knowing config field names."""
-    if callable(value) and not isinstance(value, type):
+    if callable(value):
         return type(value).__name__
     return str(value)
 
@@ -108,6 +110,12 @@ def _format_absent(value, detail=PreviewValueDetail.COMPACT) -> None:
 @format_preview_value.register(Enum)
 def _format_enum(value: Enum, detail=PreviewValueDetail.COMPACT) -> str | None:
     return value.name if value.value is not None else None
+
+
+@format_preview_value.register(type)
+def _format_type(value: type, detail=PreviewValueDetail.COMPACT) -> str:
+    declaration = canonical_declaration_mro(value)[0]
+    return FieldDisplayText.from_field_name(declaration.__name__).display_name
 
 
 @format_preview_value.register(FunctionType)
