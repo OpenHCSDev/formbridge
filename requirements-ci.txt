@@ -1,2 +1,3 @@
 # Source candidates needed to validate this checkout before coordinated publication.
-# Empty: every first-party dependency is released (objectstate 4.0.1, zmqruntime 0.6.5, metaclass-registry 0.4.0, python-introspect 0.3.0).
+# ObjectState 5 is a source candidate pending coordinated publication.
+objectstate @ git+https://github.com/OpenHCSDev/ObjectState.git@main
