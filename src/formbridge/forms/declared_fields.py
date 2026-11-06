@@ -66,7 +66,9 @@ class DeclaredViews:
     declaration, so a parent's never passes to a child and nothing reads a class
     body. The family is the inheritance tree below the class asked: adding a kind
     of field is adding a class, and nothing lists the members or tests types.
-    A backend's field widgets and editors are such families.
+    A backend's field widgets and editors are such families. A family root lists
+    this mixin before its widget base, so the `shows` keyword is taken here before
+    a framework's own __init_subclass__ sees it.
     """
 
     shows: ClassVar[tuple[object, ...]] = ()
