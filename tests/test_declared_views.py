@@ -1,8 +1,10 @@
 """A view family is the inheritance tree below it; each class declares what it shows."""
 
+from typing import Annotated
+
 import pytest
 
-from formbridge.forms.declared_fields import DeclaredViews
+from formbridge.forms.declared_fields import DeclaredMetadata, DeclaredViews, declarations
 
 
 class Number:
@@ -42,6 +44,23 @@ def test_a_class_shows_only_what_it_declares():
 def test_a_declaration_no_member_shows_is_refused():
     with pytest.raises(LookupError):
         FieldWidget.showing(str.__mro__)
+
+
+class Prepared(DeclaredMetadata):
+    """Metadata whose one instance names the kind that edits it."""
+
+    def __init__(self, kind: type) -> None:
+        self.kind = kind
+
+    def declares(self):
+        yield self.kind
+        yield from super().declares()
+
+
+def test_metadata_that_declares_more_is_read_through_its_own_declaration():
+    annotation = Annotated[str, Prepared(Count)]
+    assert FieldWidget.showing(declarations(annotation)) is CountWidget
+    assert next(iter(declarations(Annotated[str, Number()]))) is Number
 
 
 def test_a_family_asked_below_its_root_answers_from_its_own_tree():

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, fields, is_dataclass
-from functools import cached_property
+from functools import cached_property, singledispatch
 from inspect import cleandoc
 from typing import Annotated, ClassVar, Optional, Self, TypeVar, get_args, get_origin
 
@@ -95,6 +95,29 @@ class DeclaredViews:
         raise LookupError(f"No {cls.__name__} shows any of {declarations!r}")
 
 
+class DeclaredMetadata:
+    """Annotation metadata that says what it declares, beyond its own class.
+
+    By default an item declares its class and that class's bases. A member
+    overrides `declares` when one instance declares more, such as choices prepared
+    for one field that name the editors it needs.
+    """
+
+    def declares(self) -> Iterator[object]:
+        yield from type(self).__mro__[:-1]
+
+
+@singledispatch
+def metadata_declarations(item: object) -> Iterator[object]:
+    """Foreign metadata declares its class and that class's bases."""
+    return iter(type(item).__mro__[:-1])
+
+
+@metadata_declarations.register
+def _(item: DeclaredMetadata) -> Iterator[object]:
+    return item.declares()
+
+
 def declarations(annotation: object) -> Iterator[object]:
     """What an annotation declares, most specific first.
 
@@ -104,7 +127,7 @@ def declarations(annotation: object) -> Iterator[object]:
     if get_origin(annotation) is Annotated:
         base, *metadata = get_args(annotation)
         for item in metadata:
-            yield from type(item).__mro__[:-1]
+            yield from metadata_declarations(item)
         yield from declarations(base)
     elif optional_member_type(annotation) is not None:
         yield Optional
