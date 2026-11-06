@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, fields, is_dataclass
-from functools import cached_property
+from functools import cached_property, singledispatch
 from inspect import cleandoc
 from typing import Annotated, ClassVar, Optional, Self, TypeVar, get_args, get_origin
 
@@ -59,33 +59,63 @@ class FormPage:
 
 
 class DeclaredViews:
-    """A family of widget classes, each registered under what it shows.
+    """A capability mixin: a family of widget classes, each declaring what it shows.
 
-    A class directly below this one starts a family. A member names the
-    declarations it shows in its own body (`shows = (int,)`), so adding a kind
-    of field is adding a class: nothing lists the members and nothing chooses
-    between them by testing types. A backend's field widgets and editors are
-    such families.
+    A member declares what it shows as a class keyword
+    (`class IntEditor(ValueEditor, shows=(int,))`). Every class records its own
+    declaration, so a parent's never passes to a child and nothing reads a class
+    body. The family is the inheritance tree below the class asked: adding a kind
+    of field is adding a class, and nothing lists the members or tests types.
+    A backend's field widgets and editors are such families. A family root lists
+    this mixin before its widget base, so the `shows` keyword is taken here before
+    a framework's own __init_subclass__ sees it.
     """
 
     shows: ClassVar[tuple[object, ...]] = ()
-    shown_by: ClassVar[dict[object, Callable]]
 
-    def __init_subclass__(cls, **kwargs: object) -> None:
+    def __init_subclass__(cls, *, shows: tuple[object, ...] = (), **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)
-        if DeclaredViews in cls.__bases__:
-            cls.shown_by = {}
-        for declaration in vars(cls).get("shows", ()):
-            cls.shown_by[declaration] = cls
+        cls.shows = shows
+
+    @classmethod
+    def members(cls) -> Iterator[type[Self]]:
+        """This class and every class below it."""
+        yield cls
+        for member in cls.__subclasses__():
+            yield from member.members()
 
     @classmethod
     def showing(cls, declarations: Iterable[object]) -> Callable[..., Self]:
-        """The member registered under the first of these declarations that has one."""
+        """The member that shows the first of these declarations one of them shows."""
+        shown_by = {declaration: member for member in cls.members() for declaration in member.shows}
         declarations = tuple(declarations)
         for declaration in declarations:
-            if declaration in cls.shown_by:
-                return cls.shown_by[declaration]
+            if declaration in shown_by:
+                return shown_by[declaration]
         raise LookupError(f"No {cls.__name__} shows any of {declarations!r}")
+
+
+class DeclaredMetadata:
+    """Annotation metadata that says what it declares, beyond its own class.
+
+    By default an item declares its class and that class's bases. A member
+    overrides `declares` when one instance declares more, such as choices prepared
+    for one field that name the editors it needs.
+    """
+
+    def declares(self) -> Iterator[object]:
+        yield from type(self).__mro__[:-1]
+
+
+@singledispatch
+def metadata_declarations(item: object) -> Iterator[object]:
+    """Foreign metadata declares its class and that class's bases."""
+    return iter(type(item).__mro__[:-1])
+
+
+@metadata_declarations.register
+def _(item: DeclaredMetadata) -> Iterator[object]:
+    return item.declares()
 
 
 def declarations(annotation: object) -> Iterator[object]:
@@ -97,7 +127,7 @@ def declarations(annotation: object) -> Iterator[object]:
     if get_origin(annotation) is Annotated:
         base, *metadata = get_args(annotation)
         for item in metadata:
-            yield from type(item).__mro__[:-1]
+            yield from metadata_declarations(item)
         yield from declarations(base)
     elif optional_member_type(annotation) is not None:
         yield Optional
