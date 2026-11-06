@@ -59,32 +59,37 @@ class FormPage:
 
 
 class DeclaredViews:
-    """A family of widget classes, each registered under what it shows.
+    """A capability mixin: a family of widget classes, each declaring what it shows.
 
-    A class directly below this one starts a family. A member names the
-    declarations it shows in its own body (`shows = (int,)`), so adding a kind
-    of field is adding a class: nothing lists the members and nothing chooses
-    between them by testing types. A backend's field widgets and editors are
-    such families.
+    A member declares what it shows as a class keyword
+    (`class IntEditor(ValueEditor, shows=(int,))`). Every class records its own
+    declaration, so a parent's never passes to a child and nothing reads a class
+    body. The family is the inheritance tree below the class asked: adding a kind
+    of field is adding a class, and nothing lists the members or tests types.
+    A backend's field widgets and editors are such families.
     """
 
     shows: ClassVar[tuple[object, ...]] = ()
-    shown_by: ClassVar[dict[object, Callable]]
 
-    def __init_subclass__(cls, **kwargs: object) -> None:
+    def __init_subclass__(cls, *, shows: tuple[object, ...] = (), **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)
-        if DeclaredViews in cls.__bases__:
-            cls.shown_by = {}
-        for declaration in vars(cls).get("shows", ()):
-            cls.shown_by[declaration] = cls
+        cls.shows = shows
+
+    @classmethod
+    def members(cls) -> Iterator[type[Self]]:
+        """This class and every class below it."""
+        yield cls
+        for member in cls.__subclasses__():
+            yield from member.members()
 
     @classmethod
     def showing(cls, declarations: Iterable[object]) -> Callable[..., Self]:
-        """The member registered under the first of these declarations that has one."""
+        """The member that shows the first of these declarations one of them shows."""
+        shown_by = {declaration: member for member in cls.members() for declaration in member.shows}
         declarations = tuple(declarations)
         for declaration in declarations:
-            if declaration in cls.shown_by:
-                return cls.shown_by[declaration]
+            if declaration in shown_by:
+                return shown_by[declaration]
         raise LookupError(f"No {cls.__name__} shows any of {declarations!r}")
 
 
