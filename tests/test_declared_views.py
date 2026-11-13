@@ -63,6 +63,14 @@ def test_metadata_that_declares_more_is_read_through_its_own_declaration():
     assert next(iter(declarations(Annotated[str, Number()]))) is Number
 
 
+@pytest.mark.parametrize("value_type", (str, int, bool))
+def test_documentation_does_not_replace_the_value_or_prepared_declaration(value_type):
+    assert tuple(declarations(Annotated[value_type, "Field help"])) == tuple(declarations(value_type))
+    annotation = Annotated[value_type, "Field help", Prepared(Count)]
+    assert next(declarations(annotation)) is Count
+    assert FieldWidget.showing(declarations(annotation)) is CountWidget
+
+
 def test_a_family_asked_below_its_root_answers_from_its_own_tree():
     assert NumberWidget.showing(Count.__mro__) is CountWidget
     with pytest.raises(LookupError):

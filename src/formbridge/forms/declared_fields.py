@@ -118,6 +118,12 @@ def _(item: DeclaredMetadata) -> Iterator[object]:
     return item.declares()
 
 
+@metadata_declarations.register
+def documentation_declarations(item: str) -> Iterator[object]:
+    """Annotation help text describes a field; it does not declare a text value."""
+    return iter(())
+
+
 def declarations(annotation: object) -> Iterator[object]:
     """What an annotation declares, most specific first.
 
