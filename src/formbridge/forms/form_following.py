@@ -59,14 +59,18 @@ class FollowingForm(ABC):
     state: ObjectState
     parts: list[FollowedFieldView]
 
-    @property
-    def form_values(self) -> Mapping[str, FollowedValueView]:
-        """Path-to-view index. Built once from parts; native forms may cache it."""
-        return {
+    def build_index(self) -> None:
+        """Build the path-to-view index once from parts. Call after parts are
+        populated; late-built views register through their native build owner."""
+        self._form_values: Mapping[str, FollowedValueView] = {
             view.field.path.value: view
             for part in self.parts
             for view in part.values()
         }
+
+    @property
+    def form_values(self) -> Mapping[str, FollowedValueView]:
+        return self._form_values
 
     def follow_state(self) -> None:
         self.state.on_resolved_changed(self.values_changed)

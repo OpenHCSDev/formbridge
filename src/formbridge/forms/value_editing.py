@@ -171,6 +171,11 @@ class OptionalEditing(ValueEditing):
     checking restores the member editor, finish delegates to the member.
     """
 
+    @property
+    @abstractmethod
+    def member_editor(self) -> ValueEditing:
+        """The member editor, created by native bind_control."""
+
     @abstractmethod
     def set_member_shown(self, held: bool) -> None:
         """Show or hide the member editor natively."""
@@ -186,5 +191,8 @@ class OptionalEditing(ValueEditing):
             self.clear_feedback()
             self.send(None)
 
+    def finish(self) -> None:
+        self.member_editor.finish()
+
     def value_text(self, value: object) -> str:
-        return "not set" if value is None else str(value)
+        return "not set" if value is None else self.member_editor.value_text(value)
