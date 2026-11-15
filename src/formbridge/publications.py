@@ -121,3 +121,35 @@ class PublicationStream:
         for event_type in type(event).__mro__:
             if bucket := self.subscriptions.get(event_type):
                 yield from bucket
+
+
+class PublicationDelivery:
+    """One publication carried to a receiver, retaining its emission-time publisher.
+
+    A native carrier (Textual Message, Qt queued event) composes this with its
+    native delivery base. The shared fields are the event, its subscription
+    resource, the publisher at emission time, and a consume callback.
+    """
+
+    __slots__ = ("event", "subscription", "_publisher", "consume")
+
+    def __init__(
+        self,
+        event: object,
+        subscription: Subscription,
+        consume: Callable = lambda receiver, delivery: None,
+    ) -> None:
+        self.event = event
+        self.subscription = subscription
+        self._publisher = subscription.stream.publisher
+        self.consume = consume
+
+    @property
+    def publisher(self) -> object:
+        return self._publisher
+
+    def can_replace(self, other: PublicationDelivery) -> bool:
+        """Whether this delivery replaces an adjacent queued one."""
+        return (self.subscription is other.subscription
+                and hasattr(self.event, "replaces")
+                and self.event.replaces(other.event))
