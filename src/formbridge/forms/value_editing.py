@@ -8,14 +8,19 @@ feedback display and painting. The bodies here are moved from Toad's
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
+from enum import Enum
 from typing import ClassVar, Self
 
 from formbridge.forms.declared_fields import (
     DeclaredField,
     DeclaredViews,
+    Multiline,
     OptionalMemberField,
     declarations,
 )
+from formbridge.forms.ui_utils import format_enum_display
+from python_introspect import AnnotationChoices, declared_annotation_choices, resolve_annotated
 from python_introspect.validation import validate_annotation_value
 
 
@@ -106,3 +111,80 @@ class LineEditing(ValueEditing):
         except (TypeError, ValueError):
             return False
         return True
+
+
+class SelectEditing(ValueEditing):
+    """Shared select behavior: option list, value-in-list check, label lookup."""
+
+    @abstractmethod
+    def options(self) -> Iterable[tuple[str, object]]:
+        """Each offered value with its display label."""
+
+    @abstractmethod
+    def displayed_options(self) -> Iterable[tuple[str, object]]:
+        """The currently installed native options. Native selects read this."""
+
+    def lists(self, value: object) -> bool:
+        """Whether the current option list contains this value."""
+        return any(value == choice for _, choice in self.displayed_options())
+
+    def value_text(self, value: object) -> str:
+        for label, choice in self.displayed_options():
+            if value == choice:
+                return label
+        return super().value_text(value)
+
+
+class ChoicesEditing(SelectEditing):
+    """Shared choices behavior: read AnnotationChoices from the field's annotation."""
+
+    @property
+    def choices(self) -> AnnotationChoices:
+        choices = declared_annotation_choices(self.field.annotation)
+        assert choices is not None
+        return choices
+
+    def options(self) -> Iterable[tuple[str, object]]:
+        return self.choices.labelled_choices()
+
+
+class EnumEditing(SelectEditing):
+    """Shared enum behavior: iterate enum members as labelled options."""
+
+    def options(self) -> Iterable[tuple[str, object]]:
+        members: type[Enum] = resolve_annotated(self.field.annotation)  # type: ignore[assignment]
+        return ((format_enum_display(member), member) for member in members)
+
+
+class MultilineEditing(ValueEditing):
+    """Shared multiline behavior: suppress default note (too long for help text)."""
+
+    def default_note(self) -> str:
+        return ""
+
+
+class OptionalEditing(ValueEditing):
+    """Shared optional behavior: held/member state, toggle, finish delegation.
+
+    Native controls create the checkbox and member editor. The shared
+    algorithm owns the held-value semantics: unchecking sends None,
+    checking restores the member editor, finish delegates to the member.
+    """
+
+    @abstractmethod
+    def set_member_shown(self, held: bool) -> None:
+        """Show or hide the member editor natively."""
+
+    @abstractmethod
+    def paint_held(self, held: bool) -> None:
+        """Update the native checkbox without triggering a change echo."""
+
+    def change_held(self, held: bool) -> None:
+        """Called by native checkbox change. The shared algorithm."""
+        self.set_member_shown(held)
+        if not held:
+            self.clear_feedback()
+            self.send(None)
+
+    def value_text(self, value: object) -> str:
+        return "not set" if value is None else str(value)
