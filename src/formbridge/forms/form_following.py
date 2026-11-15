@@ -7,7 +7,6 @@ bodies from Toad's FormView, moved once.
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping, Sequence
 from typing import Any
 
@@ -16,14 +15,14 @@ from objectstate import ObjectState
 from formbridge.forms.value_editing import ValueEditing
 
 
-class FollowedFieldView(ABC):
+class FollowedFieldView:
     """A part of a form that holds nested field views and supports filtering."""
 
-    @abstractmethod
-    def values(self) -> Iterator[FollowedValueView]: ...
+    def values(self) -> Iterator[FollowedValueView]:
+        raise NotImplementedError
 
-    @abstractmethod
-    def filter(self, term: str) -> bool: ...
+    def filter(self, term: str) -> bool:
+        raise NotImplementedError
 
 
 class FollowedValueView(FollowedFieldView):
@@ -32,8 +31,8 @@ class FollowedValueView(FollowedFieldView):
     field: Any
     editor: ValueEditing
 
-    @abstractmethod
-    def mark(self, changed: bool) -> None: ...
+    def mark(self, changed: bool) -> None:
+        raise NotImplementedError
 
     def values(self) -> Iterator[FollowedValueView]:
         yield self
@@ -42,7 +41,7 @@ class FollowedValueView(FollowedFieldView):
         return term in self.field.search_text
 
 
-class FollowingForm(ABC):
+class FollowingForm:
     """Shared subscription to ObjectState: repaint changed values, mark dirty fields.
 
     A native form composes this with its container widget. The subscription
@@ -89,7 +88,7 @@ class FollowingForm(ABC):
         for part in self.parts:
             part.filter(term.lower())
 
-    @abstractmethod
     def repaint_editor(self, editor: ValueEditing) -> None:
         """Repaint one editor from its field's current value. Native: check
         the editor is still mounted/live before painting."""
+        raise NotImplementedError
