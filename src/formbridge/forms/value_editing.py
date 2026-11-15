@@ -16,6 +16,7 @@ from formbridge.forms.declared_fields import (
     OptionalMemberField,
     declarations,
 )
+from python_introspect.validation import validate_annotation_value
 
 
 class ValueEditing(DeclaredViews):
@@ -86,33 +87,22 @@ class ControlConstruction(ValueEditing):
 
 
 class LineEditing(ValueEditing):
-    """Shared line-editor behavior: read, acceptable, finish."""
+    """Shared line-editor behavior: read text as the field's type, validate before send.
 
-    @abstractmethod
-    def read_text(self) -> str:
-        """The current native text."""
-
-    def acceptable(self, text: str) -> bool:
-        try:
-            self.field.validate(self.read(text))
-            return True
-        except (TypeError, ValueError):
-            return False
+    Native finish decides when to commit (on blur, enter, etc.) and uses
+    read/acceptable from here. The native text accessor stays native.
+    """
 
     def read(self, text: str) -> object:
+        """Parse text into the field's value. Default: identity (strings)."""
         return text
 
-    def finish(self) -> None:
-        text = self.read_text()
+    def acceptable(self, text: str) -> bool:
+        """Whether the text would be a valid edit. Used by native validators."""
         try:
-            value = self.read(text)
-            self.field.validate(value)
-        except (TypeError, ValueError) as error:
-            self.refuse(error)
-            self.restore_value()
-        else:
-            self.send(value)
-
-    @abstractmethod
-    def restore_value(self) -> None:
-        """Paint the committed value back after a refused edit."""
+            validate_annotation_value(
+                self.field.annotation, self.read(text), path=self.field.label
+            )
+        except (TypeError, ValueError):
+            return False
+        return True
