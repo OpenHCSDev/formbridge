@@ -53,6 +53,7 @@ path = "src/formbridge/__init__.py"
 packages = ["src/formbridge"]
 
 [tool.pytest.ini_options]
+pythonpath = ["src"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 
