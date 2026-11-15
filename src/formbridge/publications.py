@@ -123,6 +123,60 @@ class PublicationStream:
                 yield from bucket
 
 
+class PublicationReceiver:
+    """Subscription lifecycle management for a receiver of typed publications.
+
+    A native carrier (Textual DOMNode, Qt QObject) composes this with its
+    framework base. The shared receiver owns subscription tracking and
+    observation; native hooks enqueue, invoke and stop native propagation.
+
+    Consumed event types are read from MroDispatch handler declarations
+    (metaclass-registry). The receiver never calls post_message or invoke.
+    """
+
+    def __init__(self) -> None:
+        self._subscriptions: set[Subscription] = set()
+        self._observations: dict[PublicationStream, tuple[Subscription, ...]] = {}
+
+    def consumed_event_types(self, base_type: type) -> tuple[type, ...]:
+        """Event types this receiver handles, filtered to a base type.
+        Reads from MroDispatch._handler_declarations if the receiver
+        inherits MroDispatch; otherwise returns an empty tuple."""
+        declarations = getattr(type(self), "_handler_declarations", ())
+        return tuple(dict.fromkeys(
+            event for _name, classes in declarations
+            for event in classes if issubclass(event, base_type)
+        ))
+
+    def subscribe_to(
+        self,
+        stream: PublicationStream,
+        event_type: type,
+        listener: Callable,
+        **kwargs: object,
+    ) -> Subscription:
+        subscription = stream.subscribe(event_type, listener, **kwargs)
+        self._subscriptions.add(subscription)
+        return subscription
+
+    def observe(self, stream: PublicationStream, base_type: type, listener: Callable) -> None:
+        """Subscribe to every handled event type on this stream."""
+        self._observations.setdefault(stream, tuple(
+            stream.subscribe(event, listener) for event in self.consumed_event_types(base_type)
+        ))
+
+    def retire_subscription(self, subscription: Subscription) -> None:
+        subscription.close()
+        self._subscriptions.discard(subscription)
+
+    def retire_observations(self, stream: PublicationStream) -> None:
+        for subscription in self._observations.pop(stream, ()):
+            subscription.close()
+        for subscription in tuple(self._subscriptions):
+            if subscription.stream is stream:
+                self.retire_subscription(subscription)
+
+
 class PublicationDelivery:
     """One publication carried to a receiver, retaining its emission-time publisher.
 
