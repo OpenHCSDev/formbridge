@@ -8,8 +8,8 @@ bodies from Toad's FormView, moved once.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Iterator, Mapping
-from typing import ClassVar
+from collections.abc import Iterator, Mapping, Sequence
+from typing import Any
 
 from objectstate import ObjectState
 
@@ -29,13 +29,8 @@ class FollowedFieldView(ABC):
 class FollowedValueView(FollowedFieldView):
     """One field's view: the editor, its field and its mark."""
 
-    @property
-    @abstractmethod
-    def field(self): ...
-
-    @property
-    @abstractmethod
-    def editor(self) -> ValueEditing: ...
+    field: Any
+    editor: ValueEditing
 
     @abstractmethod
     def mark(self, changed: bool) -> None: ...
@@ -57,7 +52,7 @@ class FollowingForm(ABC):
     """
 
     state: ObjectState
-    parts: list[FollowedFieldView]
+    parts: Sequence[FollowedFieldView]
 
     def build_index(self) -> None:
         """Build the path-to-view index once from parts. Call after parts are
