@@ -62,15 +62,11 @@ class FollowingForm(ABC):
     def build_index(self) -> None:
         """Build the path-to-view index once from parts. Call after parts are
         populated; late-built views register through their native build owner."""
-        self._form_values: Mapping[str, FollowedValueView] = {
+        self.values: Mapping[str, FollowedValueView] = {
             view.field.path.value: view
             for part in self.parts
             for view in part.values()
         }
-
-    @property
-    def form_values(self) -> Mapping[str, FollowedValueView]:
-        return self._form_values
 
     def follow_state(self) -> None:
         self.state.on_resolved_changed(self.values_changed)
@@ -82,18 +78,16 @@ class FollowingForm(ABC):
         self.state.off_state_changed(self.marks_changed)
 
     def values_changed(self, paths: set[str]) -> None:
-        values = self.form_values
-        for path in paths & values.keys():
-            self.repaint_editor(values[path].editor)
+        for path in paths & self.values.keys():
+            self.repaint_editor(self.values[path].editor)
 
     def marks_changed(self, paths: set[str]) -> None:
-        values = self.form_values
         differ = self.state.dirty_fields
-        for path in paths & values.keys():
-            values[path].mark(path in differ)
+        for path in paths & self.values.keys():
+            self.values[path].mark(path in differ)
 
     def finish(self) -> None:
-        for view in self.form_values.values():
+        for view in self.values.values():
             view.editor.finish()
 
     def filter_parts(self, term: str) -> None:
