@@ -35,7 +35,12 @@ class Subscription:
     _listener: Callable[[], Callable | None] = field(init=False, repr=False)
 
     def __post_init__(self, listener: Callable) -> None:
-        self._listener = WeakMethod(listener)
+        self._listener = self.weak_method(listener)
+
+    @staticmethod
+    def weak_method(callback: Callable) -> Callable[[], Callable | None]:
+        """A subscription borrows a bound receiver; it never owns its caller."""
+        return WeakMethod(callback)
 
     def bucket_opened(self) -> None:
         """The first subscription for this event type was added."""
