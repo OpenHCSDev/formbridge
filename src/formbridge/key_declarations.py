@@ -323,3 +323,11 @@ class SharedKeyPreference(KeyPreference):
 
     def preference_identity(self, mode: type[InputMode]) -> str | None:
         return self.shared_identity(mode)
+
+
+@dataclass(frozen=True)
+class KeymapClaim:
+    """A detached default claim, with its original nominal invocation intact."""
+
+    invocation: KeyInvocation
+    keys: tuple[str, ...]
