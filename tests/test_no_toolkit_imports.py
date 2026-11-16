@@ -9,7 +9,9 @@ from pathlib import Path
 
 import formbridge
 
-TOOLKIT_PACKAGES = ("PyQt6", "PyQt5", "PySide6", "PySide2", "qtpy", "pyqt_reactive", "tkinter")
+TOOLKIT_PACKAGES = (
+    "PyQt6", "PyQt5", "PySide6", "PySide2", "qtpy", "pyqt_reactive", "tkinter", "textual",
+)
 
 
 def _formbridge_modules() -> tuple[str, ...]:
