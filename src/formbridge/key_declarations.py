@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Callable, ClassVar, Generic, Iterator, TypeVar
 
 NodeT = TypeVar("NodeT", contravariant=True)
+BindingT = TypeVar("BindingT")
 
 
 class InputMode:
@@ -22,6 +23,39 @@ class InputMode:
     def navigation_spellings(cls, key: type[NavigationKey]) -> tuple[str, ...]:
         return (key.key,)
 
+    @classmethod
+    def fallback_bindings(cls, binding: BindingT) -> tuple[BindingT, ...]:
+        """Keys declared under this mode answer only through the focus chain."""
+        return ()
+
+
+class TextEntryMode(InputMode):
+    """Text entry: printable keys enter text, and the mode says whether application commands
+    and history navigation reach past it. A toolkit's editing engine subclasses it; keys
+    declared for ordinary text entry are declared under this class."""
+
+    @property
+    def accepts_text(self) -> bool:
+        return True
+
+    @property
+    def label(self) -> str:
+        return ""
+
+    @property
+    def allows_application_commands(self) -> bool:
+        return False
+
+    @property
+    def allows_history_navigation(self) -> bool:
+        return self.accepts_text
+
+    @classmethod
+    def binding_mode(cls) -> type[TextEntryMode]:
+        """The mode class this mode's bindings are declared under: a fact of the class,
+        so asking it never builds a mode."""
+        return TextEntryMode
+
 
 class ModalInputMode(InputMode):
     """An input mode whose keys are commands until a key enters text."""
@@ -31,6 +65,11 @@ class ModalInputMode(InputMode):
     @classmethod
     def navigation_spellings(cls, key: type[NavigationKey]) -> tuple[str, ...]:
         return (*super().navigation_spellings(key), key.modal)
+
+    @classmethod
+    def fallback_bindings(cls, binding: BindingT) -> tuple[BindingT, ...]:
+        """A modal mode's keys are commands, so they also answer from outside the focus chain."""
+        return (binding,)
 
 
 class KeyDeclarationType(ABCMeta):
@@ -250,3 +289,37 @@ class LeftKey(NavigationKey, key="left", modal="h"):
 
 class RightKey(NavigationKey, key="right", modal="l"):
     pass
+
+
+class KeyPreference:
+    """Which saved key preference a binding belongs to: the id its author declared, else the
+    shared preference of the native key it was declared on, in the active mode.
+
+    A toolkit binding inherits this and supplies ``id`` and ``declared_key``.
+    """
+
+    id: str | None
+    declared_key: DeclaredKey
+
+    def command_invocations(self) -> tuple[KeyInvocation, ...]:
+        """Named external actions expose no nominal command."""
+        return ()
+
+    def invocations(self) -> tuple[KeyInvocation, ...]:
+        return self.declared_key.invocations(self.command_invocations())
+
+    def shared_identity(self, mode: type[InputMode]) -> str | None:
+        """The arrow preference this binding's key shares in the mode, if its key is an arrow."""
+        return next((invocation.binding_identity(mode) for invocation in self.invocations()), self.id)
+
+    def preference_identity(self, mode: type[InputMode]) -> str | None:
+        """A named action keeps the id its author declared; without one it joins its arrow's
+        shared preference, so a keymap for that id replaces every key the author listed."""
+        return self.id if self.id is not None else self.shared_identity(mode)
+
+
+class SharedKeyPreference(KeyPreference):
+    """A native command on an arrow always shares the arrow's preference, whatever id it carries."""
+
+    def preference_identity(self, mode: type[InputMode]) -> str | None:
+        return self.shared_identity(mode)
