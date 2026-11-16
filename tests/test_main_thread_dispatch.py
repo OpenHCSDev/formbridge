@@ -70,7 +70,7 @@ def test_close_cancels_posted_work_and_rejects_new_work() -> None:
     dispatcher = QueuedMainThreadDispatcher()
     calls: list[str] = []
     dispatcher.post(lambda: calls.append("late"))
-    dispatcher.close()
+    dispatcher.close_dispatch()
     finished: Future[None] = Future()
     finished.set_result(None)
     dispatcher.run_until(finished)
