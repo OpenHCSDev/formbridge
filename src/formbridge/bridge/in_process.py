@@ -803,7 +803,7 @@ class UiAgentBridgeService(UiBridgeOperationServer):
     def close(self) -> None:
         """Fence callbacks queued by this bridge instance."""
 
-        self._dispatcher.close()
+        self._dispatcher.close_dispatch()
 
     def register_provider(self, provider: UiCodeDocumentProviderABC) -> None:
         self._registry.register_code_document_provider(provider)

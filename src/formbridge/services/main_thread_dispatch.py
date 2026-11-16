@@ -88,9 +88,16 @@ class DispatchedCall(Generic[ResultT]):
 
 
 class MainThreadDispatcher(ABC):
-    """Own every callable queued onto the owner thread."""
+    """Own every callable queued onto the owner thread.
 
-    def __init__(self) -> None:
+    A capability as well as an object: a toolkit's application widget can inherit its
+    member beside the widget base (the constructor continues the cooperative chain), so
+    posting work onto its thread is the application's own method, not a forward to a
+    helper. Its shutdown is ``close_dispatch``, named apart from the widget's ``close``.
+    """
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
         self._lock = threading.Lock()
         self._closed = False
         self._calls: set[DispatchedCall] = set()
@@ -110,7 +117,7 @@ class MainThreadDispatcher(ABC):
     def _undeliverable_error(self) -> MainThreadDispatchError:
         return MainThreadDispatchError("No owner thread is available for dispatch.")
 
-    def close(self) -> None:
+    def close_dispatch(self) -> None:
         """Reject new work and cancel callbacks which have not begun."""
 
         with self._lock:
