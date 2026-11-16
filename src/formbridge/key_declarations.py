@@ -331,3 +331,19 @@ class KeymapClaim:
 
     invocation: KeyInvocation
     keys: tuple[str, ...]
+
+
+class NativeTextKeys:
+    """A control whose printable keys are text, whatever its screen's keyboard profile."""
+
+    @property
+    def takes_typed_text(self) -> bool:
+        return True
+
+    @property
+    def key_mode(self) -> type[TextEntryMode]:
+        return TextEntryMode
+
+    @property
+    def allows_application_commands(self) -> bool:
+        return self.key_mode().allows_application_commands
