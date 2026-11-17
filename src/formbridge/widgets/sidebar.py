@@ -81,8 +81,9 @@ class QtPlacementControl(QToolButton, metaclass=PyQtWidgetMeta):
     sibling does; the family owns what the press does and how the control reads."""
 
     def __init__(self, action: PlacementAction, layout: PlacementLayout,
-                 identity: object, applied: Callable[[], None]) -> None:
-        super().__init__()
+                 identity: object, applied: Callable[[], None],
+                 parent: QWidget | None = None) -> None:
+        super().__init__(parent)
         self.action = action
         self._layout = layout
         self._identity = identity
@@ -122,14 +123,15 @@ class SidebarPane(QWidget):
 
     def __init__(self, layout: PlacementLayout, identity: object,
                  content: QWidget, owner: SidebarControlsOwner, *,
-                 applied: Callable[[], None]) -> None:
-        super().__init__()
+                 applied: Callable[[], None],
+                 parent: QWidget | None = None) -> None:
+        super().__init__(parent)
         self._layout = layout
         self._identity = identity
         self._owner = owner
         self.content = content
         self._controls = [
-            QtPlacementControl(action, layout, identity, applied)
+            QtPlacementControl(action, layout, identity, applied, parent=self)
             for action in owner.placement_actions()
         ]
         # The pane's layout is rebuilt on every present() because the edge may have changed.
@@ -200,8 +202,9 @@ class SidebarToggle(QWidget):
 
     def __init__(self, layout: PlacementLayout, identity: object, *,
                  heading: Callable[[], str], shown: Callable[[], bool],
-                 toggled: Callable[[], None]) -> None:
-        super().__init__()
+                 toggled: Callable[[], None],
+                 parent: QWidget | None = None) -> None:
+        super().__init__(parent)
         self._layout = layout
         self._identity = identity
         self._heading = heading
