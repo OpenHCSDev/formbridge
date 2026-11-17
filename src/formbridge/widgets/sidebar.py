@@ -119,18 +119,9 @@ class QtPlacementControl(QToolButton, metaclass=PyQtWidgetMeta):
 
 
 class SidebarPane(QWidget):
-    """A sidebar's expanded pane: the placement controls over or under its content, depending
-    on the edge the pane is on. Controls dock on the pane's interior-facing side so they stay
-    adjacent to the content and away from the workspace wall:
-
-      - leading edge (left, top): controls at the TRAILING end (bottom of a top-edge pane,
-        right of a left-edge pane).
-      - trailing edge (right, bottom): controls at the LEADING end (top of a bottom-edge
-        pane, left of a right-edge pane).
-
-    Axis follows the edge too: horizontal pane (top/bottom edge) → controls in a row at the
-    far edge; vertical pane (left/right edge) → controls in a column at the far edge.
-    """
+    """A sidebar's expanded pane: content fills the pane and the placement controls sit in a
+    horizontal row at the bottom, regardless of the edge the pane is on. A row keeps the
+    controls compact on a narrow side-edge pane where a vertical stack would eat screen."""
 
     def __init__(self, layout: PlacementLayout, identity: object,
                  content: QWidget, owner: SidebarControlsOwner, *,
@@ -146,66 +137,27 @@ class SidebarPane(QWidget):
             QtPlacementControl(action, layout, identity, applied, parent=self)
             for action in owner.placement_actions()
         ]
-        # The pane's layout is rebuilt on every present() because the edge may have changed.
-        # No widgets are destroyed; they are re-parented into the new axis+order.
-        self._column: QVBoxLayout | None = None
-        self._row: QHBoxLayout | None = None
         self._outer = QVBoxLayout(self)
         self._outer.setContentsMargins(0, 0, 0, 0)
         self._outer.setSpacing(0)
-        self._apply_layout_for(None)
+        self._build_layout()
 
     def present(self) -> None:
-        placement = self._layout.get(self._identity)
-        self._apply_layout_for(placement)
         self._owner.present_placement_controls(self._controls, self._layout, self._identity)
 
-    def _apply_layout_for(self, placement: Placement | None) -> None:
-        """Arrange content and controls for the current edge; controls always face the
-        interior of the workspace."""
-        # Remove children from any existing arrangement; they are re-added below.
-        for child in (self.content, *self._controls):
-            child.setParent(self)
-        while self._outer.count():
-            self._outer.takeAt(0)
-        axis_horizontal = self._is_horizontal_axis(placement)
-        controls_leading = self._controls_leading(placement)
-        if axis_horizontal:
-            band: QHBoxLayout | QVBoxLayout = QHBoxLayout()
-        else:
-            band = QVBoxLayout()
+    def _build_layout(self) -> None:
+        """Content fills the pane; controls sit in a row at the bottom."""
+        self.content.setParent(self)
+        for control in self._controls:
+            control.setParent(self)
+        band = QHBoxLayout()
         band.setContentsMargins(2, 2, 2, 2)
         band.setSpacing(2)
         for control in self._controls:
             band.addWidget(control)
         band.addStretch(1)
-        if controls_leading:
-            self._outer.addLayout(band)
-            self._outer.addWidget(self.content, 1)
-        else:
-            self._outer.addWidget(self.content, 1)
-            self._outer.addLayout(band)
-
-    @staticmethod
-    def _is_horizontal_axis(placement: Placement | None) -> bool:
-        """Top/bottom edges run the pane horizontally (content laid out on a row); left/right
-        run vertically. Floating always uses a horizontal strip over the content."""
-        if placement is None or placement.floating:
-            return True
-        return placement.side.__name__.startswith(("Top", "Bottom"))
-
-    @staticmethod
-    def _controls_leading(placement: Placement | None) -> bool:
-        """Controls sit on the pane's interior-facing side. On a trailing edge (right,
-        bottom) the pane's leading end IS the interior, so controls go first. On a leading
-        edge (left, top) controls go last. Floating defaults to leading (top of the overlay
-        strip), matching the Textual overlay layout."""
-        if placement is None or placement.floating:
-            return True
-        return isinstance(placement.side, type) and any(
-            base.__name__ in {"TrailingSidebarEdge", "TrailingPlacementEdge"}
-            for base in placement.side.__mro__
-        )
+        self._outer.addWidget(self.content, 1)
+        self._outer.addLayout(band)
 
 
 class _RotatableTitle(ElidedLine):
