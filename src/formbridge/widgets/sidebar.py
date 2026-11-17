@@ -84,6 +84,12 @@ class QtPlacementControl(QToolButton, metaclass=PyQtWidgetMeta):
                  identity: object, applied: Callable[[], None],
                  parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        # Keep this a child widget even when transiently reparented to None during
+        # layout rearrangement. Without Qt.Widget, Qt-for-Android gives any parent-less
+        # QWidget its own top-level QWindow + EGL surface; the second surface races
+        # QtAndroidAccessibility::runInObjectContext() for the eglSurface() mutex and
+        # trips the deadlock protector (SIGABRT a second after ApplicationActive).
+        self.setWindowFlags(Qt.WindowType.Widget)
         self.action = action
         self._layout = layout
         self._identity = identity
@@ -126,6 +132,7 @@ class SidebarPane(QWidget):
                  applied: Callable[[], None],
                  parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self.setWindowFlags(Qt.WindowType.Widget)
         self._layout = layout
         self._identity = identity
         self._owner = owner
@@ -205,6 +212,7 @@ class SidebarToggle(QWidget):
                  toggled: Callable[[], None],
                  parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self.setWindowFlags(Qt.WindowType.Widget)
         self._layout = layout
         self._identity = identity
         self._heading = heading
