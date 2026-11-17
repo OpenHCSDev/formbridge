@@ -129,6 +129,12 @@ class SidebarPane(QWidget):
                  parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowFlags(Qt.WindowType.Widget)
+        # Object-name is the hook the host's QSS selector reads — matching
+        # `pyqt_reactive.theming.style_generator.generate_sidebar_pane_style()`'s
+        # `QWidget#SidebarPane` selector — so the host can paint the pane with the
+        # shared scheme's sidebar tone without the style bleeding into unrelated
+        # QWidget children.
+        self.setObjectName("SidebarPane")
         self._layout = layout
         self._identity = identity
         self._owner = owner
@@ -218,6 +224,11 @@ class SidebarToggle(QWidget):
                  parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowFlags(Qt.WindowType.Widget)
+        # Object-name hooks the host's QSS selector — matches
+        # `pyqt_reactive.theming.style_generator.generate_sidebar_bar_style()`'s
+        # `QWidget#SidebarToggle` — so the bar paints the scheme's header tone
+        # instead of leaking its parent's colour.
+        self.setObjectName("SidebarToggle")
         self._layout = layout
         self._identity = identity
         self._heading = heading
